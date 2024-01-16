@@ -1,5 +1,4 @@
 .attach*
-/bin
 /target
 target/
 .idea/
