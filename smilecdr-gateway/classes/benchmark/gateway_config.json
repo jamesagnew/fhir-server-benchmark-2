@@ -1,0 +1,104 @@
+{
+  "targets" : [ {
+    "id" : "Write-def",
+    "baseUrl" : "http://localhost:8000/DEFAULT",
+    "resourceIdPrefix" : "def-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-def",
+    "baseUrl" : "http://localhost:8001/DEFAULT",
+    "resourceIdPrefix" : "def-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms1",
+    "baseUrl" : "http://localhost:8000/MS1",
+    "resourceIdPrefix" : "ms1-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms1",
+    "baseUrl" : "http://localhost:8001/MS1",
+    "resourceIdPrefix" : "ms1-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms1-noprefix",
+    "baseUrl" : "http://localhost:8000/MS1",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms1-noprefix",
+    "baseUrl" : "http://localhost:8001/MS1",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms2",
+    "baseUrl" : "http://localhost:8000/MS2",
+    "resourceIdPrefix" : "ms2-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms2",
+    "baseUrl" : "http://localhost:8001/MS2",
+    "resourceIdPrefix" : "ms2-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms2-noprefix",
+    "baseUrl" : "http://localhost:8000/MS2",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms2-noprefix",
+    "baseUrl" : "http://localhost:8001/MS2",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  } ],
+  "searchRoutes" : [ {
+    "id" : "search",
+    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "targets" : [ {
+      "targetId" : "Read-def"
+    }, {
+      "targetId" : "Read-ms1"
+    }, {
+      "targetId" : "Read-ms2"
+    } ],
+    "parallel" : false
+  } ],
+  "readRoutes" : [ {
+    "id" : "read",
+    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "targets" : [ {
+      "targetId" : "Read-def"
+    }, {
+      "targetId" : "Read-ms1"
+    }, {
+      "targetId" : "Read-ms2"
+    } ],
+    "parallel" : false
+  } ],
+  "updateRoutes" : [ {
+    "id" : "update",
+    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "targets" : [ {
+      "targetId" : "Write-def"
+    }, {
+      "targetId" : "Write-ms1"
+    }, {
+      "targetId" : "Write-ms2"
+    } ],
+    "parallel" : false
+  } ],
+  "transactionRoutes" : [ {
+    "id" : "transaction",
+    "targets" : [ {
+      "targetId" : "Write-ms1-noprefix"
+    }, {
+      "targetId" : "Write-ms2-noprefix"
+    } ],
+    "parallel" : false
+  } ]
+}

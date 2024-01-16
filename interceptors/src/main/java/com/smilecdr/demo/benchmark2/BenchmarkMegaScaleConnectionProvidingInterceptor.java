@@ -7,7 +7,7 @@
  * All rights reserved.
  * #L%
  */
-package com.smilecdr.demo.fhirstorage;
+package com.smilecdr.demo.benchmark2;
 
 import ca.cdr.api.fhir.interceptor.CdrHook;
 import ca.cdr.api.fhir.interceptor.CdrPointcut;
@@ -18,6 +18,8 @@ import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
+
+import static com.smilecdr.demo.benchmark2.BenchmarkConstants.MEGASCALE_COUNT;
 
 /**
  * This interceptor is invoked when initiating a request for a MegaScale
@@ -51,6 +53,9 @@ public class BenchmarkMegaScaleConnectionProvidingInterceptor {
 
 	@Nonnull
 	private static MegaScaleCredentialResponseJson createCredentialResponse(int partitionNumber) {
+		Validate.isTrue(partitionNumber >= 1);
+		Validate.isTrue(partitionNumber <= MEGASCALE_COUNT);
+
 		MegaScaleCredentialResponseJson retVal = new MegaScaleCredentialResponseJson();
 		retVal.setDatabaseUrl("jdbc:postgresql://localhost:5432/cdr_ms" + partitionNumber);
 		retVal.setDatabaseUsername("cdr_ms" + partitionNumber);
