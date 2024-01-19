@@ -41,7 +41,6 @@ public class GatewayInterceptor {
 		String partitionId = patientIdRaw.substring(2, patientIdRaw.indexOf('-'));
 		int partition = Integer.parseInt(partitionId);
 		boolean skip = !theTarget.getId().equals("Read-ms" + partition);
-		ourLog.info("Skip is {} for patient ID {} giving partition {} and wanting {}", skip, patientIdRaw, partition, theTarget.getId());
 		theRequest.setSkip(skip);
 	}
 
@@ -66,9 +65,15 @@ public class GatewayInterceptor {
 	private static int patientIdToPartitionId(String patientIdRaw) {
 		String patientId = new IdType(patientIdRaw).getIdPart();
 		Validate.notBlank(patientId, "No patient ID provided");
-		int partition = (patientId.hashCode() % BenchmarkConstants.MEGASCALE_COUNT) + 1;
+		int partition = Math.abs(patientId.hashCode() % BenchmarkConstants.MEGASCALE_COUNT) + 1;
 		return partition;
 	}
 
+
+	public static void main(String[] args) {
+		System.out.println("PART: " + patientIdToPartitionId("urn:uuid:e1f65a50-999d-84f2-25d4-22c7fb5af86d"));
+
+
+	}
 
 }
