@@ -15,12 +15,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public abstract class BaseFileIterator {
 	private static final Logger ourLog = LoggerFactory.getLogger(BaseFileIterator.class);
 	protected int myTotalFiles;
 	protected StopWatch mySw;
+	protected final AtomicLong myFilesUploadedCount = new AtomicLong(0);
+	protected final AtomicLong myResourcesUploadedCount = new AtomicLong(0);
 
 	protected void processFilesInDirectory(File sourceDir, int threadCount) throws IOException, InterruptedException, ExecutionException {
 		ourLog.info("Scanning directory for files...");

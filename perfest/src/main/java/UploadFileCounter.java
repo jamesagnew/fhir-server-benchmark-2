@@ -1,23 +1,18 @@
 import org.apache.commons.lang3.Validate;
-import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class UploadFileCounter extends BaseFileIterator {
 	private static final Logger ourLog = LoggerFactory.getLogger(UploadFileCounter.class);
-	private AtomicInteger myFilesUploadedCount = new AtomicInteger(0);
-	private AtomicInteger myResourcesUploadedCount = new AtomicInteger(0);
 
 	@Override
 	protected void handleFile(File theFile, byte[] bytes, int theResourceCount) {
-		int filesUploaded = myFilesUploadedCount.incrementAndGet();
-		int resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
+		long filesUploaded = myFilesUploadedCount.incrementAndGet();
+		long resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
 		String estRemaining = mySw.getEstimatedTimeRemaining(filesUploaded, myTotalFiles);
-		ourLog.info("Uploaded file {}/{}, {} resources - EstRemaining: {}", filesUploaded, myTotalFiles, resourcesUploaded, estRemaining);
+		ourLog.info("Counted file {}/{}, {} resources - EstRemaining: {}", filesUploaded, myTotalFiles, resourcesUploaded, estRemaining);
 	}
 
 	public static void main(String[] theArgs) throws Exception {

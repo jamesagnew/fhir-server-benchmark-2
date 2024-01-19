@@ -1,12 +1,8 @@
-import ca.uhn.fhir.jpa.dao.GZipUtil;
 import ca.uhn.fhir.rest.client.impl.HttpBasicAuthInterceptor;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
-import ca.uhn.fhir.util.ThreadPoolUtil;
 import com.codahale.metrics.SlidingWindowReservoir;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.http.HttpRequestInterceptor;
@@ -19,19 +15,11 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.rest.api.Constants.CT_FHIR_JSON_NEW;
 import static ca.uhn.fhir.rest.api.Constants.ENCODING_GZIP;
@@ -46,8 +34,6 @@ public class Uploader extends BaseFileIterator {
 	private static final Logger ourLog = LoggerFactory.getLogger(Uploader.class);
 	private final AtomicInteger myFailureCount = new AtomicInteger(0);
 	private final AtomicInteger myRetryCount = new AtomicInteger(0);
-	private final AtomicInteger myFilesUploadedCount = new AtomicInteger(0);
-	private final AtomicInteger myResourcesUploadedCount = new AtomicInteger(0);
 	private final SlidingWindowReservoir myThroughputReservoir = new SlidingWindowReservoir(25);
 	private CloseableHttpClient myClient;
 	private String myBaseUrl;
@@ -103,11 +89,11 @@ public class Uploader extends BaseFileIterator {
 			}
 		}
 
-		int filesUploaded = myFilesUploadedCount.incrementAndGet();
-		int resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
+		long filesUploaded = myFilesUploadedCount.incrementAndGet();
+		long resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
 		int resourcePerSecondOverall = (int) mySw.getThroughput(resourcesUploaded, TimeUnit.SECONDS);
 		int filesPerSecondOverall = (int) mySw.getThroughput(filesUploaded, TimeUnit.SECONDS);
-		int resourcePerSecondFile = (int) fileSw.getThroughput(resourcesUploaded, TimeUnit.SECONDS);
+		int resourcePerSecondFile = (int) fileSw.getThroughput(theResourceCount, TimeUnit.SECONDS);
 		myThroughputReservoir.update(resourcePerSecondFile);
 		int resourcesPerSecondSliding = (int) myThroughputReservoir.getSnapshot().getMean();
 		String estRemaining = mySw.getEstimatedTimeRemaining(filesUploaded, myTotalFiles);
