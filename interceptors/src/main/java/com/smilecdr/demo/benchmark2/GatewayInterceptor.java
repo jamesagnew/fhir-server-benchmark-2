@@ -70,10 +70,4 @@ public class GatewayInterceptor {
 	}
 
 
-	public static void main(String[] args) {
-		System.out.println("PART: " + patientIdToPartitionId("urn:uuid:e1f65a50-999d-84f2-25d4-22c7fb5af86d"));
-
-
-	}
-
 }
