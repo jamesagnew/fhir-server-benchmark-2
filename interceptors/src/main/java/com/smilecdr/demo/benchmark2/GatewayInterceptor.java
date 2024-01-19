@@ -41,6 +41,7 @@ public class GatewayInterceptor {
 		String partitionId = patientIdRaw.substring(2, patientIdRaw.indexOf('-'));
 		int partition = Integer.parseInt(partitionId);
 		boolean skip = !theTarget.getId().equals("Read-ms" + partition);
+		ourLog.info("Skip is {} for patient ID {} giving partition {} and wanting {}", skip, patientIdRaw, partition, theTarget.getId());
 		theRequest.setSkip(skip);
 	}
 
