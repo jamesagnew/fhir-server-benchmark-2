@@ -11,8 +11,9 @@ public class UploadFileCounter extends BaseFileIterator {
 	protected void handleFile(File theFile, byte[] bytes, int theResourceCount) {
 		long filesUploaded = myFilesUploadedCount.incrementAndGet();
 		long resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
+		long avgResourcesPerFile = resourcesUploaded / filesUploaded;
 		String estRemaining = mySw.getEstimatedTimeRemaining(filesUploaded, myTotalFiles);
-		ourLog.info("Counted file {}/{}, {} resources - EstRemaining: {}", filesUploaded, myTotalFiles, resourcesUploaded, estRemaining);
+		ourLog.info("Counted file {}/{}, {} resources - Avg {}/file - EstRemaining: {}", filesUploaded, myTotalFiles, resourcesUploaded, avgResourcesPerFile, estRemaining);
 	}
 
 	public static void main(String[] theArgs) throws Exception {
@@ -25,7 +26,7 @@ public class UploadFileCounter extends BaseFileIterator {
 		File sourceDir = new File(theArgs[0]);
 		Validate.isTrue(sourceDir.exists() && sourceDir.isDirectory() && sourceDir.canRead(), "Directory " + theArgs[0] + " does not exist or can't be read");
 
-		this.processFilesInDirectory(sourceDir, 10);
+		this.processFilesInDirectory(sourceDir, 20);
 	}
 
 }
