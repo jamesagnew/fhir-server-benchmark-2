@@ -122,7 +122,7 @@ public class Benchmarker {
 		myUpdateTask = new UpdateTask(myUpdateThreadPool);
 		myUpdateTask.start();
 		myCreateTask = new CreateTask(myCreateThreadPool);
-		myCreateTask.start();
+		//myCreateTask.start();
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
@@ -432,11 +432,11 @@ public class Benchmarker {
 			long perSecondFail = (long) (myFailureMeter.getOneMinuteRate() / 60L);
 
 			ourLog.info(
-				"READ[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"SEARCH[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"UPDATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"CREATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"FAIL[ Total {} - MovAvg {}/sec]",
+				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"\nFAIL[ Total {} - MovAvg {}/sec]",
 				totalRead, allTimeRead, perSecondRead,
 				totalSearch, allTimeSearch, perSecondSearch,
 				totalUpdate, allTimeUpdate, perSecondUpdate,
