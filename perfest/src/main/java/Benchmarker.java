@@ -22,6 +22,7 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.DateTimeType;
 import org.hl7.fhir.r4.model.Encounter;
 import org.hl7.fhir.r4.model.IdType;
+import org.hl7.fhir.r4.model.InstantType;
 import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Reference;
@@ -31,6 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +45,10 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER;
+import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN;
+import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN_MINIMAL;
 
 public class Benchmarker {
 	public static final ContentType CONTENT_TYPE_FHIR_JSON = ContentType.create(Constants.CT_FHIR_JSON_NEW, StandardCharsets.UTF_8);
@@ -86,8 +93,9 @@ public class Benchmarker {
 	private UpdateTask myUpdateTask;
 	private String myReadNodeBaseUrl;
 	private CreateTask myCreateTask;
+	private FileWriter myCsvWriter;
 
-	private void run(String[] theArgs) {
+	private void run(String[] theArgs) throws IOException {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
 		Validate.isTrue(theArgs.length == 4, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
@@ -122,7 +130,17 @@ public class Benchmarker {
 		myUpdateTask = new UpdateTask(myUpdateThreadPool);
 		myUpdateTask.start();
 		myCreateTask = new CreateTask(myCreateThreadPool);
-		//myCreateTask.start();
+		myCreateTask.start();
+
+		myCsvWriter = new FileWriter("benchmark.csv");
+		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
+		myCsvWriter.append("\n# MillisSinceStart, " +
+			"TotalRead, AllTimeReadPerSec, MovingAvgReadPerSec, " +
+			"TotalSearch, AllTimeSearchPerSec, MovingAvgSearchPerSec, " +
+			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, " +
+			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, " +
+			"TotalFailures, MovingAvgFailuresPerSec" +
+			"\n");
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
@@ -238,7 +256,7 @@ public class Benchmarker {
 	}
 
 
-	public static void main(String[] theArgs) {
+	public static void main(String[] theArgs) throws IOException {
 		new Benchmarker().run(theArgs);
 	}
 
@@ -315,10 +333,11 @@ public class Benchmarker {
 
 
 			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
-			HttpPut post = new HttpPut(url);
-			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
+			HttpPut put = new HttpPut(url);
+			put.addHeader(HEADER_PREFER, HEADER_PREFER_RETURN + "=" + HEADER_PREFER_RETURN_MINIMAL);
+			put.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
-			try (var response = myHttpClient.execute(post)) {
+			try (var response = myHttpClient.execute(put)) {
 				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
 					myUpdateMeter.mark();
 					myUpdateCount.incrementAndGet();
@@ -364,6 +383,7 @@ public class Benchmarker {
 
 			String url = myGatewayBaseUrl + "/Observation";
 			HttpPost post = new HttpPost(url);
+			post.addHeader(HEADER_PREFER, HEADER_PREFER_RETURN + "=" + HEADER_PREFER_RETURN_MINIMAL);
 			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
 			try (var response = myHttpClient.execute(post)) {
@@ -443,6 +463,23 @@ public class Benchmarker {
 				totalCreate, allTimeCreate, perSecondCreate,
 				totalFail, perSecondFail
 			);
+
+			long millis = mySw.getMillis();
+			millis = millis - (millis % 1000);
+
+			try {
+				myCsvWriter.append(
+					millis + "," +
+						totalRead + "," + allTimeRead + "," + perSecondRead + "," +
+						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
+						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
+						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
+						totalFail + "," + perSecondFail + "\n"
+				);
+				myCsvWriter.flush();
+			} catch (Exception e) {
+				ourLog.error("Failed to write CSV", e);
+			}
 		}
 	}
 

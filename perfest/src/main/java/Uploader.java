@@ -44,7 +44,7 @@ public class Uploader extends BaseFileIterator {
 	private CloseableHttpClient myClient;
 	private String myBaseUrl;
 	private Timer myLogTimer;
-	private FileWriter myFileWriter;
+	private FileWriter myCsvWriter;
 
 	private void run(String[] args) throws Exception {
 		String syntaxMsg = "Syntax: " + Uploader.class.getName() + " [baseUrl] [directory containing .gz synthea files] [number of threads] [start index]";
@@ -116,9 +116,9 @@ public class Uploader extends BaseFileIterator {
 
 		myResourcesUploadedMeter = newMeter();
 
-		myFileWriter = new FileWriter("upload-synthea.csv", true);
-		myFileWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
-		myFileWriter.append("\n# MillisSinceStart, FilesPerSecond, ResPerSecondOverall, ResPerSecondMovingAvg, Retries, Failures\n");
+		myCsvWriter = new FileWriter("upload-synthea.csv", true);
+		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
+		myCsvWriter.append("\n# MillisSinceStart, FilesPerSecond, ResPerSecondOverall, ResPerSecondMovingAvg, Retries, Failures\n");
 
 		myLogTimer = new Timer();
 		long delay = DateUtils.MILLIS_PER_MINUTE;
@@ -128,7 +128,7 @@ public class Uploader extends BaseFileIterator {
 	@Override
 	protected void finishing() throws Exception {
 		myLogTimer.cancel();
-		myFileWriter.close();
+		myCsvWriter.close();
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -176,7 +176,7 @@ public class Uploader extends BaseFileIterator {
 			try {
 				long millis = mySw.getMillis();
 				millis = millis - (millis % 1000);
-				myFileWriter.append(
+				myCsvWriter.append(
 					millis + "," +
 						filesPerSecondOverall + "," +
 						resourcePerSecondOverall + "," +
