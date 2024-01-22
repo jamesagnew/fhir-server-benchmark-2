@@ -35,7 +35,7 @@ public class GatewayInterceptor {
 			return;
 		}
 		if (!patientIdRaw.startsWith("ms") && !patientIdRaw.contains("-")) {
-			throw new InvalidRequestException("Invalid 'patient' parameter provided");
+			throw new InvalidRequestException("Invalid 'patient' parameter provided: " + patientIdRaw);
 		}
 
 		String partitionId = patientIdRaw.substring(2, patientIdRaw.indexOf('-'));
