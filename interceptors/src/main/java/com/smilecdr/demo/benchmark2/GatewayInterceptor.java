@@ -30,19 +30,6 @@ public class GatewayInterceptor {
 			return;
 		}
 
-		// The benchmark code uses a special parameter to request a specific
-		// megascale DB so that it can perform initial data fetch searches across
-		// each DB
-		String wantMs = theRequest.getParameter("_want-ms");
-		ourLog.info("Want MS: {}", wantMs);
-		if (wantMs != null) {
-			int partition = Integer.parseInt(wantMs);
-			boolean skip = !theTarget.getId().equals("Read-ms" + partition);
-			theRequest.setSkip(skip);
-			theRequest.removeParameters("_want-ms");
-			return;
-		}
-
 		String patientIdRaw = theRequest.getParameter("patient");
 		if (patientIdRaw == null) {
 			return;

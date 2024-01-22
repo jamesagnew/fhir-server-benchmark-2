@@ -1,6 +1,7 @@
 package com.smilecdr.demo.benchmark2;
 
 import ca.cdr.api.fhirgw.json.GatewayConfigurationJson;
+import ca.cdr.api.fhirgw.json.GatewayCreateRouteJson;
 import ca.cdr.api.fhirgw.json.GatewayReadRouteJson;
 import ca.cdr.api.fhirgw.json.GatewayRouteTargetJson;
 import ca.cdr.api.fhirgw.json.GatewaySearchRouteJson;
@@ -57,6 +58,14 @@ public class GatewayConfigGenerator {
 		updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-def"));
 		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
 			updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i));
+		}
+
+		// Create Route
+		GatewayCreateRouteJson create = config.addCreateRoute();
+		create.setId("create");
+		create.addResourceType("Observation");
+		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+			create.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i));
 		}
 
 		// Transaction Route

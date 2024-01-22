@@ -2,7 +2,8 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
-import ca.uhn.fhir.rest.gclient.StringClientParam;
+import ca.uhn.fhir.rest.client.interceptor.UrlTenantSelectionInterceptor;
+import ca.uhn.fhir.util.ResourceReferenceInfo;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
 import ca.uhn.fhir.util.ThreadPoolUtil;
@@ -11,10 +12,8 @@ import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Encounter;
@@ -39,7 +38,7 @@ public class Benchmarker {
 	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
 	private static final FhirContext ourCtx = FhirContext.forR4Cached();
 	private static final int PATIENT_COUNT = 1000;
-	private IGenericClient myFhirClient;
+	private IGenericClient myGatewayFhirClient;
 	private List<IIdType> myPatientIds = new ArrayList<>();
 	private List<IIdType> myEncounterIds = new ArrayList<>();
 	private IdentityHashMap<IIdType, Encounter> myEncounters = new IdentityHashMap<>();
@@ -49,7 +48,7 @@ public class Benchmarker {
 	private ThreadPoolTaskExecutor myCreateThreadPool;
 	private CloseableHttpClient myHttpClient;
 	private ReadTask myReadTask;
-	private String myBaseUrl;
+	private String myGatewayBaseUrl;
 	private AtomicLong myFailureCount = new AtomicLong(0);
 	private AtomicLong myReadCount = new AtomicLong(0);
 	private AtomicLong mySearchCount = new AtomicLong(0);
@@ -64,19 +63,22 @@ public class Benchmarker {
 	private StopWatch mySw;
 	private SearchTask mySearchTask;
 	private UpdateTask myUpdateTask;
+	private String myReadNodeBaseUrl;
 
 	private void run(String[] theArgs) {
-		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [base URL] [thread count]";
-		Validate.isTrue(theArgs.length == 2, syntaxMsg);
-		myBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
-		int threadCount = Integer.parseInt(theArgs[1]);
+		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
+		Validate.isTrue(theArgs.length == 4, syntaxMsg);
+		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
+		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
+		int megascaleDbCount = Integer.parseInt(theArgs[2]);
+		int threadCount = Integer.parseInt(theArgs[3]);
 
-		myFhirClient = ourCtx.newRestfulGenericClient(myBaseUrl);
-		myFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
+		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
+		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
 		myHttpClient = Uploader.createHttpClient();
 		ourLog.info("Benchmarker starting with {} thread count", threadCount);
-		loadData();
+		loadData(megascaleDbCount);
 
 		myReadThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "read-", 100);
 		mySearchThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "search-", 100);
@@ -102,59 +104,27 @@ public class Benchmarker {
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
 	}
 
-	private void loadData() {
-		String wantMs = "2";
+	private void loadData(int theMegascaleDbCount) {
+		int idsPerMegaScaleDb = 1000 / theMegascaleDbCount;
 
-        myPatientIds.addAll(loadDataPatients("1"));
-        myPatientIds.addAll(loadDataPatients("2"));
+		for (int i = 1; i <= theMegascaleDbCount; i++) {
+			IGenericClient client = ourCtx.newRestfulGenericClient(myReadNodeBaseUrl);
+			client.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
+			client.registerInterceptor(new UrlTenantSelectionInterceptor("MS" + i));
 
-
-		ourLog.info("Loading Encounter List Page 0...");
-		Bundle outcome = myFhirClient
-			.search()
-			.forResource(Encounter.class)
-			.count(100)
-			.elementsSubset("id")
-			.returnBundle(Bundle.class)
-			.execute();
-		int pageIndex = 0;
-		while (true) {
-			List<Encounter> encounters = outcome
-				.getEntry()
-				.stream()
-				.map(Bundle.BundleEntryComponent::getResource)
-				.map(t->(Encounter)t)
-				.filter(Objects::nonNull)
-				.collect(Collectors.toList());
-			for (var next : encounters) {
-				if (myEncounterIds.size() <= 1000) {
-					IdType nextId = next.getIdElement().toVersionless();
-					ourLog.info("Got encounter ID: {}", nextId);
-					next.getMeta().setVersionId(null);
-					next.setId(nextId);
-					myEncounterIds.add(nextId);
-					myEncounters.put(nextId, next);
-				}
-			}
-			if (outcome.getLink("next") == null || myEncounters.size() >= 1000) {
-				ourLog.info("Done loading Encounter list, have {} IDs...", myEncounters.size());
-				break;
-			}
-
-			ourLog.info("Loading Encounter List Page {}, have {} IDs...", ++pageIndex, myEncounters.size());
-			outcome = myFhirClient.loadPage().next(outcome).execute();
-
+			loadDataPatients(idsPerMegaScaleDb, i, client);
 		}
+
 	}
 
-	private List<IIdType> loadDataPatients(String wantMs) {
-		List<IIdType> patientIds = new ArrayList<>();
-		ourLog.info("Loading Patient List for MegaScale Instance {} Page 0...", wantMs);
-		Bundle outcome = myFhirClient
+	private void loadDataPatients(int theIdsToLoad, int theMegascaleDb, IGenericClient theClient) {
+		List<IIdType> gatewayFriendlyPatientIds = new ArrayList<>();
+		List<IIdType> originalPatientIds = new ArrayList<>();
+		ourLog.info("Loading Patient List Page 0 for MegaScale DB {}...", theMegascaleDb);
+		Bundle outcome = theClient
 			.search()
 			.forResource(Patient.class)
 			.count(100)
-			.where(new StringClientParam("_want-ms").matchesExactly().value(wantMs))
 			.elementsSubset("id")
 			.returnBundle(Bundle.class)
 			.execute();
@@ -164,24 +134,83 @@ public class Benchmarker {
 				.getEntry()
 				.stream()
 				.map(Bundle.BundleEntryComponent::getResource)
-				.map(Resource::getIdElement)
 				.filter(Objects::nonNull)
+				.map(Resource::getIdElement)
 				.collect(Collectors.toList());
 			for (var next : ids) {
-				if (patientIds.size() <= 500) {
-					patientIds.add(next);
+				if (gatewayFriendlyPatientIds.size() <= theIdsToLoad) {
+					gatewayFriendlyPatientIds.add(new IdType(myGatewayBaseUrl, next.getResourceType(), "ms" + theMegascaleDb + "-" + next.getIdPart(), null));
+				}
+				if (originalPatientIds.size() < 100) {
+					originalPatientIds.add(next.toUnqualifiedVersionless());
 				}
 			}
-			if (outcome.getLink("next") == null || patientIds.size() >= 1000) {
-				ourLog.info("Done loading Patient list, have {} IDs...", patientIds.size());
+			if (outcome.getLink("next") == null || gatewayFriendlyPatientIds.size() >= theIdsToLoad) {
+				ourLog.info("Done loading Patient list for MegaScale DB {}, have {} IDs...", theMegascaleDb, gatewayFriendlyPatientIds.size());
 				break;
 			}
 
-			ourLog.info("Loading Patient List Page {}, have {} IDs...", ++pageIndex, patientIds.size());
-			outcome = myFhirClient.loadPage().next(outcome).execute();
+			ourLog.info("Loading Patient List Page {} for MegaScale DB {}, have {} IDs...", ++pageIndex, theMegascaleDb, gatewayFriendlyPatientIds.size());
+			outcome = myGatewayFhirClient.loadPage().next(outcome).execute();
 
 		}
-		return patientIds;
+
+		myPatientIds.addAll(gatewayFriendlyPatientIds);
+
+		loadDataEncounters(theIdsToLoad, theMegascaleDb, originalPatientIds, theClient);
+	}
+
+	private void loadDataEncounters(int theIdsPerMegaScaleDb, int theMegaScaleDbIndex, List<IIdType> thePatientIds, IGenericClient theClient) {
+		List<Encounter> encounters = new ArrayList<>();
+		ourLog.info("Loading Encounter List Page 0 for MegaScale DB {}...", theMegaScaleDbIndex);
+		List<String> ids = thePatientIds.stream()
+			.map(t->t.toUnqualifiedVersionless().getValue())
+			.collect(Collectors.toList());
+		Bundle outcome = theClient
+			.search()
+			.forResource(Encounter.class)
+			.where(Encounter.PATIENT.hasAnyOfIds(ids))
+			.returnBundle(Bundle.class)
+			.execute();
+		int pageIndex = 0;
+		while (true) {
+			List<Encounter> pageEncounters = outcome
+				.getEntry()
+				.stream()
+				.map(Bundle.BundleEntryComponent::getResource)
+				.map(t->(Encounter)t)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+			for (var next : pageEncounters) {
+				if (encounters.size() <= theIdsPerMegaScaleDb) {
+					IdType nextId = next.getIdElement();
+					nextId = new IdType(myGatewayBaseUrl, nextId.getResourceType(), "ms" + theMegaScaleDbIndex + "-" + nextId.getIdPart(), null);
+					next.getMeta().setVersionId(null);
+					next.setId(nextId);
+
+					for (ResourceReferenceInfo nextRefInfo : ourCtx.newTerser().getAllResourceReferences(next)) {
+						IIdType nextRef = nextRefInfo.getResourceReference().getReferenceElement();
+						nextRefInfo.getResourceReference().setReference(nextRef.getResourceType() + "/ms" + theMegaScaleDbIndex + "-" + nextRef.getIdPart());
+					}
+
+					encounters.add(next);
+				}
+			}
+			if (outcome.getLink("next") == null || encounters.size() >= theIdsPerMegaScaleDb) {
+				ourLog.info("Done loading Encounter list for MegaScale DB {}, have {} IDs...", theMegaScaleDbIndex, encounters.size());
+				break;
+			}
+
+			ourLog.info("Loading Encounter List Page {} for MegaScale DB {}, have {} IDs...", ++pageIndex, theMegaScaleDbIndex, encounters.size());
+			outcome = myGatewayFhirClient.loadPage().next(outcome).execute();
+
+		}
+
+		for (var next : encounters) {
+			IIdType nextId = next.getIdElement();
+			myEncounterIds.add(nextId);
+			myEncounters.put(nextId, next);
+		}
 	}
 
 
@@ -226,7 +255,7 @@ public class Benchmarker {
 
 		@Override
 		protected void run(int thePatientIndex, IIdType thePatientId) {
-			String url = myBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1";
+			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1";
 			HttpGet get = new HttpGet(url);
 			try (var response = myHttpClient.execute(get)) {
 				if (response.getStatusLine().getStatusCode() == 200) {
@@ -262,7 +291,7 @@ public class Benchmarker {
 			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
 
 
-			String url = myBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
+			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
 			HttpPost post = new HttpPost(url);
 			post.setEntity(new StringEntity(newPayload, Constants.CT_FHIR_JSON_NEW));
 
