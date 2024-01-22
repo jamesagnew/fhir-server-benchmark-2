@@ -2,6 +2,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
+import ca.uhn.fhir.rest.gclient.StringClientParam;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
 import ca.uhn.fhir.util.ThreadPoolUtil;
@@ -13,6 +14,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Encounter;
@@ -101,48 +103,21 @@ public class Benchmarker {
 	}
 
 	private void loadData() {
-		ourLog.info("Loading Patient List Page 0...");
-		Bundle outcome = myFhirClient
-			.search()
-			.forResource(Patient.class)
-			.count(100)
-			.elementsSubset("id")
-			.returnBundle(Bundle.class)
-			.execute();
-		int pageIndex = 0;
-		while (true) {
-			List<IIdType> ids = outcome
-				.getEntry()
-				.stream()
-				.map(Bundle.BundleEntryComponent::getResource)
-				.map(Resource::getIdElement)
-				.filter(Objects::nonNull)
-				.collect(Collectors.toList());
-			for (var next : ids) {
-				if (myPatientIds.size() <= 1000) {
-					myPatientIds.add(next);
-				}
-			}
-			if (outcome.getLink("next") == null || myPatientIds.size() >= 1000) {
-				ourLog.info("Done loading Patient list, have {} IDs...", myPatientIds.size());
-				break;
-			}
+		String wantMs = "2";
 
-			ourLog.info("Loading Patient List Page {}, have {} IDs...", ++pageIndex, myPatientIds.size());
-			outcome = myFhirClient.loadPage().next(outcome).execute();
-
-		}
+        myPatientIds.addAll(loadDataPatients("1"));
+        myPatientIds.addAll(loadDataPatients("2"));
 
 
 		ourLog.info("Loading Encounter List Page 0...");
-		outcome = myFhirClient
+		Bundle outcome = myFhirClient
 			.search()
 			.forResource(Encounter.class)
 			.count(100)
 			.elementsSubset("id")
 			.returnBundle(Bundle.class)
 			.execute();
-		pageIndex = 0;
+		int pageIndex = 0;
 		while (true) {
 			List<Encounter> encounters = outcome
 				.getEntry()
@@ -170,6 +145,43 @@ public class Benchmarker {
 			outcome = myFhirClient.loadPage().next(outcome).execute();
 
 		}
+	}
+
+	private List<IIdType> loadDataPatients(String wantMs) {
+		List<IIdType> patientIds = new ArrayList<>();
+		ourLog.info("Loading Patient List for MegaScale Instance {} Page 0...", wantMs);
+		Bundle outcome = myFhirClient
+			.search()
+			.forResource(Patient.class)
+			.count(100)
+			.where(new StringClientParam("_want-ms").matchesExactly().value(wantMs))
+			.elementsSubset("id")
+			.returnBundle(Bundle.class)
+			.execute();
+		int pageIndex = 0;
+		while (true) {
+			List<IIdType> ids = outcome
+				.getEntry()
+				.stream()
+				.map(Bundle.BundleEntryComponent::getResource)
+				.map(Resource::getIdElement)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+			for (var next : ids) {
+				if (patientIds.size() <= 500) {
+					patientIds.add(next);
+				}
+			}
+			if (outcome.getLink("next") == null || patientIds.size() >= 1000) {
+				ourLog.info("Done loading Patient list, have {} IDs...", patientIds.size());
+				break;
+			}
+
+			ourLog.info("Loading Patient List Page {}, have {} IDs...", ++pageIndex, patientIds.size());
+			outcome = myFhirClient.loadPage().next(outcome).execute();
+
+		}
+		return patientIds;
 	}
 
 
