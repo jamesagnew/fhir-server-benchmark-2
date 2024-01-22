@@ -3,6 +3,7 @@ package com.smilecdr.demo.benchmark2;
 import ca.cdr.api.fhir.interceptor.CdrHook;
 import ca.cdr.api.fhir.interceptor.CdrPointcut;
 import ca.cdr.api.fhirgw.json.GatewayTargetJson;
+import ca.cdr.api.fhirgw.model.CreateRequest;
 import ca.cdr.api.fhirgw.model.SearchRequest;
 import ca.cdr.api.fhirgw.model.TransactionRequest;
 import ca.cdr.api.fhirgw.model.UpdateRequest;
@@ -41,6 +42,21 @@ public class GatewayInterceptor {
 		String partitionId = patientIdRaw.substring("Patient/ms".length(), patientIdRaw.indexOf('-'));
 		int partition = Integer.parseInt(partitionId);
 		boolean skip = !theTarget.getId().equals("Read-ms" + partition);
+		theRequest.setSkip(skip);
+	}
+
+	@CdrHook(CdrPointcut.FHIRGW_CREATE_TARGET_PREINVOKE)
+	public void createSelectRoute(CreateRequest theRequest, GatewayTargetJson theTarget) {
+
+		Observation obs = (Observation) theRequest.getResource();
+		String patientIdRaw = obs.getSubject().getReference();
+		if (patientIdRaw == null) {
+			throw new InvalidRequestException("No subject specified");
+		}
+
+		String partitionId = patientIdRaw.substring("Patient/ms".length(), patientIdRaw.indexOf('-'));
+		int partition = Integer.parseInt(partitionId);
+		boolean skip = !theTarget.getId().equals("Write-ms" + partition);
 		theRequest.setSkip(skip);
 	}
 

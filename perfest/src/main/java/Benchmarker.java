@@ -8,25 +8,35 @@ import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
 import ca.uhn.fhir.util.ThreadPoolUtil;
 import com.codahale.metrics.Meter;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.DateTimeType;
 import org.hl7.fhir.r4.model.Encounter;
 import org.hl7.fhir.r4.model.IdType;
+import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.StringType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -38,10 +48,22 @@ public class Benchmarker {
 	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
 	private static final FhirContext ourCtx = FhirContext.forR4Cached();
 	private static final int PATIENT_COUNT = 1000;
+	public static final ContentType CONTENT_TYPE_FHIR_JSON = ContentType.create(Constants.CT_FHIR_JSON_NEW, StandardCharsets.UTF_8);
+	public static final Encounter.EncounterStatus[] ENCOUNTER_STATUSES = {
+		Encounter.EncounterStatus.ARRIVED,
+		Encounter.EncounterStatus.CANCELLED,
+		Encounter.EncounterStatus.ENTEREDINERROR,
+		Encounter.EncounterStatus.FINISHED,
+		Encounter.EncounterStatus.INPROGRESS,
+		Encounter.EncounterStatus.ONLEAVE,
+		Encounter.EncounterStatus.PLANNED,
+		Encounter.EncounterStatus.TRIAGED,
+		Encounter.EncounterStatus.UNKNOWN
+	};
 	private IGenericClient myGatewayFhirClient;
 	private List<IIdType> myPatientIds = new ArrayList<>();
 	private List<IIdType> myEncounterIds = new ArrayList<>();
-	private IdentityHashMap<IIdType, Encounter> myEncounters = new IdentityHashMap<>();
+	private Map<String, Encounter> myEncounters = new HashMap<>();
 	private ThreadPoolTaskExecutor myReadThreadPool;
 	private ThreadPoolTaskExecutor mySearchThreadPool;
 	private ThreadPoolTaskExecutor myUpdateThreadPool;
@@ -97,7 +119,7 @@ public class Benchmarker {
 		myReadTask.start();
 		mySearchTask = new SearchTask(mySearchThreadPool);
 		mySearchTask.start();
-		myUpdateTask = new UpdateTask(mySearchThreadPool);
+		myUpdateTask = new UpdateTask(myUpdateThreadPool);
 		myUpdateTask.start();
 
 		myLoggerTimer = new Timer();
@@ -207,9 +229,9 @@ public class Benchmarker {
 		}
 
 		for (var next : encounters) {
-			IIdType nextId = next.getIdElement();
+			IIdType nextId = next.getIdElement().toUnqualifiedVersionless();
 			myEncounterIds.add(nextId);
-			myEncounters.put(nextId, next);
+			myEncounters.put(nextId.getValue(), next);
 		}
 	}
 
@@ -284,25 +306,87 @@ public class Benchmarker {
 		@Override
 		protected void run(int theEncounterIndex, IIdType theEncounterId) {
 
-			Encounter encounter = myEncounters.get(theEncounterId);
-			Encounter.EncounterStatus[] encounterStatuses = Encounter.EncounterStatus.values();
-			int newIdx = (int)(Math.random() * encounterStatuses.length);
-			encounter.setStatus(encounterStatuses[newIdx]);
+			Encounter encounter = myEncounters.get(theEncounterId.getValue());
+            int newIdx = (int)(Math.random() * ENCOUNTER_STATUSES.length);
+			encounter.setStatus(ENCOUNTER_STATUSES[newIdx]);
 			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
 
 
 			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
-			HttpPost post = new HttpPost(url);
-			post.setEntity(new StringEntity(newPayload, Constants.CT_FHIR_JSON_NEW));
+			HttpPut post = new HttpPut(url);
+			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
 			try (var response = myHttpClient.execute(post)) {
 				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
 					myUpdateMeter.mark();
 					myUpdateCount.incrementAndGet();
 				} else {
-					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
-					myFailureMeter.mark();
-					myFailureCount.incrementAndGet();
+					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
+					if (results.contains("HTTP 409")) {
+						// This means two threads tried to update the same resource, and this
+						// is expected in a high-stress benchmark, so we consider this a success
+						// since the server behaved appropriately
+						myUpdateMeter.mark();
+						myUpdateCount.incrementAndGet();
+					} else {
+						ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+						myFailureMeter.mark();
+						myFailureCount.incrementAndGet();
+					}
+				}
+			} catch (Exception e) {
+				ourLog.warn("Failure executing URL[{}]", url, e);
+				myFailureMeter.mark();
+				myFailureCount.incrementAndGet();
+			}
+		}
+	}
+
+	private class CreateTask extends BaseTaskCreator {
+
+
+		public CreateTask(ThreadPoolTaskExecutor theThreadPool) {
+			super(theThreadPool, myPatientIds);
+		}
+
+		@Override
+		protected void run(int thePatientIndex, IIdType thePatientId) {
+
+			Observation obs = new Observation();
+			obs.setStatus(Observation.ObservationStatus.FINAL);
+			obs.getCategoryFirstRep().addCoding().setSystem("http://terminology.hl7.org/CodeSystem/observation-category").setCode("vital-signs");
+			obs.setSubject(new Reference(thePatientId));
+			obs.setEffective(DateTimeType.now());
+			obs.setStatus(Observation.ObservationStatus.FINAL);
+			obs.setValue(new StringType("This is the value"));
+
+			Encounter encounter = myEncounters.get(theEncounterId.getValue());
+			int newIdx = (int)(Math.random() * ENCOUNTER_STATUSES.length);
+			encounter.setStatus(ENCOUNTER_STATUSES[newIdx]);
+			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
+
+
+			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
+			HttpPut post = new HttpPut(url);
+			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
+
+			try (var response = myHttpClient.execute(post)) {
+				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
+					myUpdateMeter.mark();
+					myUpdateCount.incrementAndGet();
+				} else {
+					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
+					if (results.contains("HTTP 409")) {
+						// This means two threads tried to update the same resource, and this
+						// is expected in a high-stress benchmark, so we consider this a success
+						// since the server behaved appropriately
+						myUpdateMeter.mark();
+						myUpdateCount.incrementAndGet();
+					} else {
+						ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+						myFailureMeter.mark();
+						myFailureCount.incrementAndGet();
+					}
 				}
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
@@ -325,9 +409,9 @@ public class Benchmarker {
 		public void run() {
 			while (true) {
 				myThreadPool.submit(()->{
-					int patientIndex = (int) (Math.random() * myPatientIds.size());
-					IIdType patientId = myPatientIds.get(patientIndex);
-					run(patientIndex, patientId);
+					int idIndex = (int) (Math.random() * myIdList.size());
+					IIdType id = myIdList.get(idIndex);
+					run(idIndex, id);
 				});
 			}
 		}
