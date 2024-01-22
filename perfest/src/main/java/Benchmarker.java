@@ -34,7 +34,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,9 +44,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class Benchmarker {
-	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
-	private static final FhirContext ourCtx = FhirContext.forR4Cached();
-	private static final int PATIENT_COUNT = 1000;
 	public static final ContentType CONTENT_TYPE_FHIR_JSON = ContentType.create(Constants.CT_FHIR_JSON_NEW, StandardCharsets.UTF_8);
 	public static final Encounter.EncounterStatus[] ENCOUNTER_STATUSES = {
 		Encounter.EncounterStatus.ARRIVED,
@@ -60,6 +56,9 @@ public class Benchmarker {
 		Encounter.EncounterStatus.TRIAGED,
 		Encounter.EncounterStatus.UNKNOWN
 	};
+	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
+	private static final FhirContext ourCtx = FhirContext.forR4Cached();
+	private static final int PATIENT_COUNT = 1000;
 	private IGenericClient myGatewayFhirClient;
 	private List<IIdType> myPatientIds = new ArrayList<>();
 	private List<IIdType> myEncounterIds = new ArrayList<>();
@@ -86,6 +85,7 @@ public class Benchmarker {
 	private SearchTask mySearchTask;
 	private UpdateTask myUpdateTask;
 	private String myReadNodeBaseUrl;
+	private CreateTask myCreateTask;
 
 	private void run(String[] theArgs) {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
@@ -121,6 +121,8 @@ public class Benchmarker {
 		mySearchTask.start();
 		myUpdateTask = new UpdateTask(myUpdateThreadPool);
 		myUpdateTask.start();
+		myCreateTask = new CreateTask(myCreateThreadPool);
+		myCreateTask.start();
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
@@ -186,7 +188,7 @@ public class Benchmarker {
 		List<Encounter> encounters = new ArrayList<>();
 		ourLog.info("Loading Encounter List Page 0 for MegaScale DB {}...", theMegaScaleDbIndex);
 		List<String> ids = thePatientIds.stream()
-			.map(t->t.toUnqualifiedVersionless().getValue())
+			.map(t -> t.toUnqualifiedVersionless().getValue())
 			.collect(Collectors.toList());
 		Bundle outcome = theClient
 			.search()
@@ -200,7 +202,7 @@ public class Benchmarker {
 				.getEntry()
 				.stream()
 				.map(Bundle.BundleEntryComponent::getResource)
-				.map(t->(Encounter)t)
+				.map(t -> (Encounter) t)
 				.filter(Objects::nonNull)
 				.collect(Collectors.toList());
 			for (var next : pageEncounters) {
@@ -260,12 +262,12 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-            } catch (Exception e) {
+			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
-           }
-        }
+			}
+		}
 	}
 
 	private class SearchTask extends BaseTaskCreator {
@@ -307,7 +309,7 @@ public class Benchmarker {
 		protected void run(int theEncounterIndex, IIdType theEncounterId) {
 
 			Encounter encounter = myEncounters.get(theEncounterId.getValue());
-            int newIdx = (int)(Math.random() * ENCOUNTER_STATUSES.length);
+			int newIdx = (int) (Math.random() * ENCOUNTER_STATUSES.length);
 			encounter.setStatus(ENCOUNTER_STATUSES[newIdx]);
 			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
 
@@ -329,7 +331,7 @@ public class Benchmarker {
 						myUpdateMeter.mark();
 						myUpdateCount.incrementAndGet();
 					} else {
-						ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+						ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), response);
 						myFailureMeter.mark();
 						myFailureCount.incrementAndGet();
 					}
@@ -355,35 +357,30 @@ public class Benchmarker {
 			Observation obs = new Observation();
 			obs.setStatus(Observation.ObservationStatus.FINAL);
 			obs.getCategoryFirstRep().addCoding().setSystem("http://terminology.hl7.org/CodeSystem/observation-category").setCode("vital-signs");
-			obs.setSubject(new Reference(thePatientId));
+			obs.setSubject(new Reference(thePatientId.toUnqualifiedVersionless()));
 			obs.setEffective(DateTimeType.now());
 			obs.setStatus(Observation.ObservationStatus.FINAL);
 			obs.setValue(new StringType("This is the value"));
+			String newPayload = ourCtx.newJsonParser().encodeToString(obs);
 
-			Encounter encounter = myEncounters.get(theEncounterId.getValue());
-			int newIdx = (int)(Math.random() * ENCOUNTER_STATUSES.length);
-			encounter.setStatus(ENCOUNTER_STATUSES[newIdx]);
-			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
-
-
-			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
-			HttpPut post = new HttpPut(url);
+			String url = myGatewayBaseUrl + "/Observation";
+			HttpPost post = new HttpPost(url);
 			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
 			try (var response = myHttpClient.execute(post)) {
 				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
-					myUpdateMeter.mark();
-					myUpdateCount.incrementAndGet();
+					myCreateMeter.mark();
+					myCreateCount.incrementAndGet();
 				} else {
 					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
 					if (results.contains("HTTP 409")) {
 						// This means two threads tried to update the same resource, and this
 						// is expected in a high-stress benchmark, so we consider this a success
 						// since the server behaved appropriately
-						myUpdateMeter.mark();
-						myUpdateCount.incrementAndGet();
+						myCreateMeter.mark();
+						myCreateCount.incrementAndGet();
 					} else {
-						ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+						ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
 						myFailureMeter.mark();
 						myFailureCount.incrementAndGet();
 					}
@@ -408,7 +405,7 @@ public class Benchmarker {
 		@Override
 		public void run() {
 			while (true) {
-				myThreadPool.submit(()->{
+				myThreadPool.submit(() -> {
 					int idIndex = (int) (Math.random() * myIdList.size());
 					IIdType id = myIdList.get(idIndex);
 					run(idIndex, id);
@@ -436,14 +433,25 @@ public class Benchmarker {
 			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
 			long perSecondUpdate = ((long) myUpdateMeter.getOneMinuteRate()) / 60L;
 
+			long totalCreate = myCreateCount.get();
+			long allTimeCreate = (long) mySw.getThroughput(totalCreate, TimeUnit.SECONDS);
+			long perSecondCreate = ((long) myCreateMeter.getOneMinuteRate()) / 60L;
+
+			long totalFail = myFailureCount.get();
+			long perSecondFail = (long) (myFailureMeter.getOneMinuteRate() / 60L);
+
 			ourLog.info(
-					"READ[ Total {} - All {}/sec - MovAvg {}/sec] " +
+				"READ[ Total {} - All {}/sec - MovAvg {}/sec] " +
 					"SEARCH[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"UPDATE[ Total {} - All {}/sec - MovAvg {}/sec]",
+					"UPDATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"CREATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"FAIL[ Total {} - MovAvg {}/sec]",
 				totalRead, allTimeRead, perSecondRead,
 				totalSearch, allTimeSearch, perSecondSearch,
-				totalUpdate, allTimeUpdate, perSecondUpdate
-				);
+				totalUpdate, allTimeUpdate, perSecondUpdate,
+				totalCreate, allTimeCreate, perSecondCreate,
+				totalFail, perSecondFail
+			);
 		}
 	}
 
