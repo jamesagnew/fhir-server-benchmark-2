@@ -323,8 +323,7 @@ public class Benchmarker {
 					myUpdateMeter.mark();
 					myUpdateCount.incrementAndGet();
 				} else {
-					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
-					if (results.contains("HTTP 409")) {
+					if (response.getStatusLine().getStatusCode() == 409) {
 						// This means two threads tried to update the same resource, and this
 						// is expected in a high-stress benchmark, so we consider this a success
 						// since the server behaved appropriately
@@ -373,17 +372,9 @@ public class Benchmarker {
 					myCreateCount.incrementAndGet();
 				} else {
 					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
-					if (results.contains("HTTP 409")) {
-						// This means two threads tried to update the same resource, and this
-						// is expected in a high-stress benchmark, so we consider this a success
-						// since the server behaved appropriately
-						myCreateMeter.mark();
-						myCreateCount.incrementAndGet();
-					} else {
-						ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
-						myFailureMeter.mark();
-						myFailureCount.incrementAndGet();
-					}
+					ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
+					myFailureMeter.mark();
+					myFailureCount.incrementAndGet();
 				}
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
