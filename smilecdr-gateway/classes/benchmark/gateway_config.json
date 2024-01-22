@@ -58,10 +58,8 @@
   } ],
   "searchRoutes" : [ {
     "id" : "search",
-    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "resourceTypes" : [ "Observation", "Patient", "Encounter" ],
     "targets" : [ {
-      "targetId" : "Read-def"
-    }, {
       "targetId" : "Read-ms1"
     }, {
       "targetId" : "Read-ms2"
@@ -70,10 +68,8 @@
   } ],
   "readRoutes" : [ {
     "id" : "read",
-    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "resourceTypes" : [ "Observation", "Patient", "Encounter" ],
     "targets" : [ {
-      "targetId" : "Read-def"
-    }, {
       "targetId" : "Read-ms1"
     }, {
       "targetId" : "Read-ms2"
@@ -82,7 +78,7 @@
   } ],
   "updateRoutes" : [ {
     "id" : "update",
-    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "resourceTypes" : [ "SearchParameter", "Patient", "Observation", "Encounter" ],
     "targets" : [ {
       "targetId" : "Write-def"
     }, {

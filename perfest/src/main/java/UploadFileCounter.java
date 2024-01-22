@@ -8,7 +8,7 @@ public class UploadFileCounter extends BaseFileIterator {
 	private static final Logger ourLog = LoggerFactory.getLogger(UploadFileCounter.class);
 
 	@Override
-	protected void handleFile(File theFile, byte[] bytes, int theResourceCount) {
+	protected void handleFile(File theFile, byte[] bytes, int theResourceCount, int theIndex) {
 		long filesUploaded = myFilesUploadedCount.incrementAndGet();
 		long resourcesUploaded = myResourcesUploadedCount.addAndGet(theResourceCount);
 		long avgResourcesPerFile = resourcesUploaded / filesUploaded;
@@ -26,7 +26,7 @@ public class UploadFileCounter extends BaseFileIterator {
 		File sourceDir = new File(theArgs[0]);
 		Validate.isTrue(sourceDir.exists() && sourceDir.isDirectory() && sourceDir.canRead(), "Directory " + theArgs[0] + " does not exist or can't be read");
 
-		this.processFilesInDirectory(sourceDir, 20);
+		this.processFilesInDirectory(sourceDir, 20, 0);
 	}
 
 }

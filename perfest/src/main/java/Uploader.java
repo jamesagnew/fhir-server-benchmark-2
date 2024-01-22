@@ -1,7 +1,8 @@
 import ca.uhn.fhir.rest.client.impl.HttpBasicAuthInterceptor;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
-import com.codahale.metrics.SlidingWindowReservoir;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.SlidingTimeWindowMovingAverages;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
@@ -13,11 +14,16 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.hl7.fhir.r4.model.InstantType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,30 +40,30 @@ public class Uploader extends BaseFileIterator {
 	private static final Logger ourLog = LoggerFactory.getLogger(Uploader.class);
 	private final AtomicInteger myFailureCount = new AtomicInteger(0);
 	private final AtomicInteger myRetryCount = new AtomicInteger(0);
-	private final SlidingWindowReservoir myThroughputReservoir = new SlidingWindowReservoir(25);
+	private Meter myResourcesUploadedMeter;
 	private CloseableHttpClient myClient;
 	private String myBaseUrl;
-
-	public static void main(String[] args) throws Exception {
-		new Uploader().run(args);
-	}
+	private Timer myLogTimer;
+	private FileWriter myFileWriter;
 
 	private void run(String[] args) throws Exception {
-		String syntaxMsg = "Syntax: " + Uploader.class.getName() + " [baseUrl] [directory containing .gz synthea files] [number of threads]";
-		Validate.isTrue(args.length == 3, syntaxMsg);
+		String syntaxMsg = "Syntax: " + Uploader.class.getName() + " [baseUrl] [directory containing .gz synthea files] [number of threads] [start index]";
+		Validate.isTrue(args.length == 4, syntaxMsg);
 		myBaseUrl = StringUtil.chompCharacter(args[0], '/');
 		Validate.isTrue(myBaseUrl.startsWith("http"), syntaxMsg);
 		File sourceDir = new File(args[1]);
 		Validate.isTrue(sourceDir.exists() && sourceDir.isDirectory() && sourceDir.canRead(), "Directory " + args[0] + " does not exist or can't be read");
 		int threadCount = Integer.parseInt(args[2]);
+		int startIndex = Integer.parseInt(args[3]);
 
 		ourLog.info("Starting {} thread uploader from directory {}", threadCount, sourceDir.getAbsolutePath());
-		createHttpClient();
+		myClient = createHttpClient();
 
-		processFilesInDirectory(sourceDir, threadCount);
+		processFilesInDirectory(sourceDir, threadCount, startIndex);
+
 	}
 
-	protected void handleFile(File theFile, byte[] bytes, int theResourceCount) {
+	protected void handleFile(File theFile, byte[] bytes, int theResourceCount, int theIndex) {
 		StopWatch fileSw = new StopWatch();
 
 		HttpPost request = new HttpPost(myBaseUrl);
@@ -94,15 +100,42 @@ public class Uploader extends BaseFileIterator {
 		int resourcePerSecondOverall = (int) mySw.getThroughput(resourcesUploaded, TimeUnit.SECONDS);
 		int filesPerSecondOverall = (int) mySw.getThroughput(filesUploaded, TimeUnit.SECONDS);
 		int resourcePerSecondFile = (int) fileSw.getThroughput(theResourceCount, TimeUnit.SECONDS);
-		myThroughputReservoir.update(resourcePerSecondFile);
-		int resourcesPerSecondSliding = (int) myThroughputReservoir.getSnapshot().getMean();
+
+		myResourcesUploadedMeter.mark(theResourceCount);
+		int resourcesPerSecondSliding = (int) (myResourcesUploadedMeter.getOneMinuteRate() / 60.0);
+
 		String estRemaining = mySw.getEstimatedTimeRemaining(filesUploaded, myTotalFiles);
 		int retryCount = myRetryCount.get();
 		int failureCount = myFailureCount.get();
-		ourLog.info("Uploaded file {}/{} in {}, {} resources - {} files/sec(overall) - {} res/sec(sliding) - {} res/sec(overall) - Retry[{}] Fail[{}] EstRemaining: {}", filesUploaded, myTotalFiles, fileSw, resourcesUploaded, filesPerSecondOverall, resourcesPerSecondSliding, resourcePerSecondOverall, retryCount, failureCount, estRemaining);
+		ourLog.info("Uploaded file {}/{} in {} ({} res/sec), {} resources - {} files/sec(overall) - {} res/sec(sliding) - {} res/sec(overall) - Retry[{}] Fail[{}] EstRemaining {}: {}", theIndex, myTotalFiles, fileSw, resourcePerSecondFile, resourcesUploaded, filesPerSecondOverall, resourcesPerSecondSliding, resourcePerSecondOverall, retryCount, failureCount, estRemaining, theFile.getName());
 	}
 
-	private void createHttpClient() {
+	@Override
+	protected void starting() throws Exception {
+		super.starting();
+
+		myResourcesUploadedMeter = newMeter();
+
+		myFileWriter = new FileWriter("upload-synthea.csv", true);
+		myFileWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
+		myFileWriter.append("\n# MillisSinceStart, FilesPerSecond, ResPerSecondOverall, ResPerSecondMovingAvg, Retries, Failures\n");
+
+		myLogTimer = new Timer();
+		long delay = DateUtils.MILLIS_PER_MINUTE;
+		myLogTimer.scheduleAtFixedRate(new LogTask(), 0, delay);
+	}
+
+	@Override
+	protected void finishing() throws Exception {
+		myLogTimer.cancel();
+		myFileWriter.close();
+	}
+
+	public static void main(String[] args) throws Exception {
+		new Uploader().run(args);
+	}
+
+	public static CloseableHttpClient createHttpClient() {
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
 		connectionManager.setMaxTotal(1000);
 		connectionManager.setDefaultMaxPerRoute(1000);
@@ -121,8 +154,42 @@ public class Uploader extends BaseFileIterator {
 		HttpRequestInterceptor auth = new HttpBasicAuthInterceptor("admin", "password");
 		builder.addInterceptorFirst(auth);
 
-		myClient = builder
-			.build();
+        return builder.build();
 	}
 
+	public static Meter newMeter() {
+		return new Meter(new SlidingTimeWindowMovingAverages());
+	}
+
+	private class LogTask extends TimerTask {
+		@Override
+		public void run() {
+			long filesUploaded = myFilesUploadedCount.get();
+			long resourcesUploaded = myResourcesUploadedCount.get();
+			int resourcePerSecondOverall = (int) mySw.getThroughput(resourcesUploaded, TimeUnit.SECONDS);
+			int filesPerSecondOverall = (int) mySw.getThroughput(filesUploaded, TimeUnit.SECONDS);
+
+			int resourcesPerSecondSliding = (int) myResourcesUploadedMeter.getMeanRate();
+
+			int retryCount = myRetryCount.get();
+			int failureCount = myFailureCount.get();
+
+			try {
+				long millis = mySw.getMillis();
+				millis = millis - (millis % 1000);
+				myFileWriter.append(
+					millis + "," +
+						filesPerSecondOverall + "," +
+						resourcePerSecondOverall + "," +
+						resourcesPerSecondSliding + "," +
+						retryCount + "," +
+						failureCount +
+						"\n"
+				);
+			} catch (IOException e) {
+				ourLog.error("Failed to write CSV row", e);
+				System.exit(0);
+			}
+		}
+	}
 }

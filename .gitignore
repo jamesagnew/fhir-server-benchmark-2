@@ -6,6 +6,7 @@ target/
 RemoteSystemsTempFiles/
 Servers/
 *.iml
+*.csv
 *.log
 *.log*
 nohup.out

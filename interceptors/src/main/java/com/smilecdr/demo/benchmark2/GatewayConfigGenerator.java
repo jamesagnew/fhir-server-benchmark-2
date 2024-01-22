@@ -35,8 +35,7 @@ public class GatewayConfigGenerator {
 		GatewaySearchRouteJson searchRoute = config.addSearchRoute();
 		searchRoute.setId("search");
 		searchRoute.setParallel(false);
-		searchRoute.setResourceTypes(Set.of("SearchParameter", "Patient", "Observation", "Encounter"));
-		searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-def"));
+		searchRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
 		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
@@ -45,8 +44,7 @@ public class GatewayConfigGenerator {
 		GatewayReadRouteJson readRoute = config.addReadRoute();
 		readRoute.setId("read");
 		readRoute.setParallel(false);
-		readRoute.setResourceTypes(Set.of("SearchParameter", "Patient", "Observation", "Encounter"));
-		readRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-def"));
+		readRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
 		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
 			readRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}

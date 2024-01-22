@@ -34,7 +34,7 @@ public class GatewayInterceptor {
 		if (patientIdRaw == null) {
 			return;
 		}
-		if (!patientIdRaw.startsWith("ms") || !patientIdRaw.contains("-")) {
+		if (!patientIdRaw.startsWith("ms") && !patientIdRaw.contains("-")) {
 			throw new InvalidRequestException("Invalid 'patient' parameter provided");
 		}
 
