@@ -1,4 +1,5 @@
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
 import ca.uhn.fhir.util.StopWatch;
@@ -8,9 +9,14 @@ import com.codahale.metrics.Meter;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Encounter;
+import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
@@ -18,12 +24,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -33,6 +39,8 @@ public class Benchmarker {
 	private static final int PATIENT_COUNT = 1000;
 	private IGenericClient myFhirClient;
 	private List<IIdType> myPatientIds = new ArrayList<>();
+	private List<IIdType> myEncounterIds = new ArrayList<>();
+	private IdentityHashMap<IIdType, Encounter> myEncounters = new IdentityHashMap<>();
 	private ThreadPoolTaskExecutor myReadThreadPool;
 	private ThreadPoolTaskExecutor mySearchThreadPool;
 	private ThreadPoolTaskExecutor myUpdateThreadPool;
@@ -53,6 +61,7 @@ public class Benchmarker {
 	private Timer myLoggerTimer;
 	private StopWatch mySw;
 	private SearchTask mySearchTask;
+	private UpdateTask myUpdateTask;
 
 	private void run(String[] theArgs) {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [base URL] [thread count]";
@@ -65,7 +74,7 @@ public class Benchmarker {
 
 		myHttpClient = Uploader.createHttpClient();
 		ourLog.info("Benchmarker starting with {} thread count", threadCount);
-		loadPages();
+		loadData();
 
 		myReadThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "read-", 100);
 		mySearchThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "search-", 100);
@@ -84,12 +93,14 @@ public class Benchmarker {
 		myReadTask.start();
 		mySearchTask = new SearchTask(mySearchThreadPool);
 		mySearchTask.start();
+		myUpdateTask = new UpdateTask(mySearchThreadPool);
+		myUpdateTask.start();
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
 	}
 
-	private void loadPages() {
+	private void loadData() {
 		ourLog.info("Loading Patient List Page 0...");
 		Bundle outcome = myFhirClient
 			.search()
@@ -121,6 +132,44 @@ public class Benchmarker {
 			outcome = myFhirClient.loadPage().next(outcome).execute();
 
 		}
+
+
+		ourLog.info("Loading Encounter List Page 0...");
+		outcome = myFhirClient
+			.search()
+			.forResource(Encounter.class)
+			.count(100)
+			.elementsSubset("id")
+			.returnBundle(Bundle.class)
+			.execute();
+		pageIndex = 0;
+		while (true) {
+			List<Encounter> encounters = outcome
+				.getEntry()
+				.stream()
+				.map(Bundle.BundleEntryComponent::getResource)
+				.map(t->(Encounter)t)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+			for (var next : encounters) {
+				if (myEncounterIds.size() <= 1000) {
+					IdType nextId = next.getIdElement().toVersionless();
+					ourLog.info("Got encounter ID: {}", nextId);
+					next.getMeta().setVersionId(null);
+					next.setId(nextId);
+					myEncounterIds.add(nextId);
+					myEncounters.put(nextId, next);
+				}
+			}
+			if (outcome.getLink("next") == null || myEncounters.size() >= 1000) {
+				ourLog.info("Done loading Encounter list, have {} IDs...", myEncounters.size());
+				break;
+			}
+
+			ourLog.info("Loading Encounter List Page {}, have {} IDs...", ++pageIndex, myEncounters.size());
+			outcome = myFhirClient.loadPage().next(outcome).execute();
+
+		}
 	}
 
 
@@ -132,7 +181,7 @@ public class Benchmarker {
 
 
 		public ReadTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool);
+			super(theThreadPool, myPatientIds);
 		}
 
 		@Override
@@ -160,7 +209,7 @@ public class Benchmarker {
 
 
 		public SearchTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool);
+			super(theThreadPool, myPatientIds);
 		}
 
 		@Override
@@ -184,11 +233,51 @@ public class Benchmarker {
 		}
 	}
 
+	private class UpdateTask extends BaseTaskCreator {
+
+
+		public UpdateTask(ThreadPoolTaskExecutor theThreadPool) {
+			super(theThreadPool, myEncounterIds);
+		}
+
+		@Override
+		protected void run(int theEncounterIndex, IIdType theEncounterId) {
+
+			Encounter encounter = myEncounters.get(theEncounterId);
+			Encounter.EncounterStatus[] encounterStatuses = Encounter.EncounterStatus.values();
+			int newIdx = (int)(Math.random() * encounterStatuses.length);
+			encounter.setStatus(encounterStatuses[newIdx]);
+			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
+
+
+			String url = myBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
+			HttpPost post = new HttpPost(url);
+			post.setEntity(new StringEntity(newPayload, Constants.CT_FHIR_JSON_NEW));
+
+			try (var response = myHttpClient.execute(post)) {
+				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
+					myUpdateMeter.mark();
+					myUpdateCount.incrementAndGet();
+				} else {
+					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+					myFailureMeter.mark();
+					myFailureCount.incrementAndGet();
+				}
+			} catch (Exception e) {
+				ourLog.warn("Failure executing URL[{}]", url, e);
+				myFailureMeter.mark();
+				myFailureCount.incrementAndGet();
+			}
+		}
+	}
+
 	private abstract class BaseTaskCreator extends Thread {
 		protected final ThreadPoolTaskExecutor myThreadPool;
+		private final List<IIdType> myIdList;
 
-		public BaseTaskCreator(ThreadPoolTaskExecutor theThreadPool) {
+		public BaseTaskCreator(ThreadPoolTaskExecutor theThreadPool, List<IIdType> theIdList) {
 			myThreadPool = theThreadPool;
+			myIdList = theIdList;
 		}
 
 		@Override
@@ -218,7 +307,18 @@ public class Benchmarker {
 			long allTimeSearch = (long) mySw.getThroughput(totalSearch, TimeUnit.SECONDS);
 			long perSecondSearch = ((long) mySearchMeter.getOneMinuteRate()) / 60L;
 
-			ourLog.info("READ[ Total {} - All {}/sec - MovAvg {}/sec] SEARCH[ Total {} - All {}/sec - MovAvg {}/sec]", totalRead, allTimeRead, perSecondRead, totalSearch, allTimeSearch, perSecondSearch);
+			long totalUpdate = myUpdateCount.get();
+			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
+			long perSecondUpdate = ((long) myUpdateMeter.getOneMinuteRate()) / 60L;
+
+			ourLog.info(
+					"READ[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"SEARCH[ Total {} - All {}/sec - MovAvg {}/sec] " +
+					"UPDATE[ Total {} - All {}/sec - MovAvg {}/sec]",
+				totalRead, allTimeRead, perSecondRead,
+				totalSearch, allTimeSearch, perSecondSearch,
+				totalUpdate, allTimeUpdate, perSecondUpdate
+				);
 		}
 	}
 

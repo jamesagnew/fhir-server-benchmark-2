@@ -137,8 +137,8 @@ public class Uploader extends BaseFileIterator {
 
 	public static CloseableHttpClient createHttpClient() {
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
-		connectionManager.setMaxTotal(1000);
-		connectionManager.setDefaultMaxPerRoute(1000);
+		connectionManager.setMaxTotal(500);
+		connectionManager.setDefaultMaxPerRoute(500);
 
 		SocketConfig socketConfig = SocketConfig
 			.copy(SocketConfig.DEFAULT)
@@ -148,8 +148,7 @@ public class Uploader extends BaseFileIterator {
 
 		HttpClientBuilder builder = HttpClientBuilder
 			.create()
-			.setConnectionManager(connectionManager)
-			.setMaxConnPerRoute(1000);
+			.setConnectionManager(connectionManager);
 
 		HttpRequestInterceptor auth = new HttpBasicAuthInterceptor("admin", "password");
 		builder.addInterceptorFirst(auth);
