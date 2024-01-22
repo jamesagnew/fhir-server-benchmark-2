@@ -34,11 +34,11 @@ public class GatewayInterceptor {
 		if (patientIdRaw == null) {
 			return;
 		}
-		if (!patientIdRaw.startsWith("ms") && !patientIdRaw.contains("-")) {
+		if (!patientIdRaw.startsWith("Patient/ms") || !patientIdRaw.contains("-")) {
 			throw new InvalidRequestException("Invalid 'patient' parameter provided: " + patientIdRaw);
 		}
 
-		String partitionId = patientIdRaw.substring(2, patientIdRaw.indexOf('-'));
+		String partitionId = patientIdRaw.substring("Patient/ms".length(), patientIdRaw.indexOf('-'));
 		int partition = Integer.parseInt(partitionId);
 		boolean skip = !theTarget.getId().equals("Read-ms" + partition);
 		theRequest.setSkip(skip);
