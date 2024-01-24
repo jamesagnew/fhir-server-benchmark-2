@@ -20,7 +20,7 @@ public class CreateUniqueSp {
 	private final FhirContext ourCtx = FhirContext.forR4Cached();
 
 	private void run(String[] theArgs) {
-		String syntaxMsg = "Syntax: " + CreateUniqueSp.class.getName() + " [baseWriteUrl1] [baseWriteUrl2] ....";
+		String syntaxMsg = "Syntax: " + CreateUniqueSp.class.getName() + " [Gateway Base Url]";
 
 		List<String> myBaseUrls = new ArrayList<>();
 		for (var next : theArgs) {
