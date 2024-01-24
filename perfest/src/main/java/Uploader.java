@@ -6,12 +6,14 @@ import com.codahale.metrics.SlidingTimeWindowMovingAverages;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.http.ConnectionReuseStrategy;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.DefaultClientConnectionReuseStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.hl7.fhir.r4.model.InstantType;
@@ -145,11 +147,14 @@ public class Uploader extends BaseFileIterator {
 		SocketConfig socketConfig = SocketConfig
 			.copy(SocketConfig.DEFAULT)
 			.setSoTimeout((int) (600 * DateUtils.MILLIS_PER_SECOND))
+			.setSoKeepAlive(true)
+			.set
 			.build();
 		connectionManager.setDefaultSocketConfig(socketConfig);
 
 		HttpClientBuilder builder = HttpClientBuilder
 			.create()
+			.setConnectionReuseStrategy(new DefaultClientConnectionReuseStrategy())
 			.setConnectionManager(connectionManager);
 
 		HttpRequestInterceptor auth = new HttpBasicAuthInterceptor("admin", "password");
