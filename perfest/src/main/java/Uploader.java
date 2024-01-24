@@ -140,7 +140,7 @@ public class Uploader extends BaseFileIterator {
 	}
 
 	public static CloseableHttpClient createHttpClient() {
-		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
+		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(600, TimeUnit.SECONDS);
 		connectionManager.setMaxTotal(500);
 		connectionManager.setDefaultMaxPerRoute(500);
 
@@ -148,7 +148,6 @@ public class Uploader extends BaseFileIterator {
 			.copy(SocketConfig.DEFAULT)
 			.setSoTimeout((int) (600 * DateUtils.MILLIS_PER_SECOND))
 			.setSoKeepAlive(true)
-			.set
 			.build();
 		connectionManager.setDefaultSocketConfig(socketConfig);
 

@@ -96,6 +96,10 @@ public class Benchmarker {
 	private FileWriter myCsvWriter;
 
 	private void run(String[] theArgs) throws IOException {
+//		if (true) {
+//			test();
+//		}
+
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
 		Validate.isTrue(theArgs.length == 4, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
@@ -144,6 +148,20 @@ public class Benchmarker {
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
+	}
+
+	private void test() throws IOException {
+		CloseableHttpClient httpClient = Uploader.createHttpClient();
+
+		HttpGet request = new HttpGet("http://localhost:8002");
+		try (var resp = httpClient.execute(request)) {
+			ourLog.info("Resp: {}", IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8));
+		}
+		try (var resp = httpClient.execute(request)) {
+			ourLog.info("Resp: {}", IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8));
+		}
+
+		System.exit(0);
 	}
 
 	private void loadData(int theMegascaleDbCount) {
