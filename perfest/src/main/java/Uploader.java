@@ -1,12 +1,13 @@
 import ca.uhn.fhir.rest.client.impl.HttpBasicAuthInterceptor;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
+import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.SlidingTimeWindowMovingAverages;
+import com.codahale.metrics.SlidingWindowReservoir;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
-import org.apache.http.ConnectionReuseStrategy;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -159,11 +160,18 @@ public class Uploader extends BaseFileIterator {
 		HttpRequestInterceptor auth = new HttpBasicAuthInterceptor("admin", "password");
 		builder.addInterceptorFirst(auth);
 
+//		HttpRequestInterceptor gzip;
+//		builder.addInterceptorFirst(gzip);
+
         return builder.build();
 	}
 
 	public static Meter newMeter() {
 		return new Meter(new SlidingTimeWindowMovingAverages());
+	}
+
+	public static Histogram newHistogram() {
+		return new Histogram(new SlidingWindowReservoir(1000));
 	}
 
 	private class LogTask extends TimerTask {

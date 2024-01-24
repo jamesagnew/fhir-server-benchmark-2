@@ -7,6 +7,7 @@ import ca.uhn.fhir.util.ResourceReferenceInfo;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
 import ca.uhn.fhir.util.ThreadPoolUtil;
+import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
@@ -50,6 +51,7 @@ import java.util.stream.Collectors;
 import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER;
 import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN;
 import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN_MINIMAL;
+import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 
 public class Benchmarker {
 	public static final ContentType CONTENT_TYPE_FHIR_JSON = ContentType.create(Constants.CT_FHIR_JSON_NEW, StandardCharsets.UTF_8);
@@ -83,10 +85,10 @@ public class Benchmarker {
 	private AtomicLong mySearchCount = new AtomicLong(0);
 	private AtomicLong myUpdateCount = new AtomicLong(0);
 	private AtomicLong myCreateCount = new AtomicLong(0);
-	private Meter myReadMeter;
-	private Meter mySearchMeter;
-	private Meter myUpdateMeter;
-	private Meter myCreateMeter;
+	private Meter myReadThroughputMeter;
+	private Meter mySearchThroughputMeter;
+	private Meter myUpdateThroughputMeter;
+	private Meter myCreateThroughputMeter;
 	private Meter myFailureMeter;
 	private Timer myLoggerTimer;
 	private StopWatch mySw;
@@ -95,6 +97,12 @@ public class Benchmarker {
 	private String myReadNodeBaseUrl;
 	private CreateTask myCreateTask;
 	private FileWriter myCsvWriter;
+	private Meter myRequestBytesMeter;
+	private Meter myResponseBytesMeter;
+	private Histogram myReadLatencyHistogram;
+	private Histogram mySearchLatencyHistogram;
+	private Histogram myUpdateLatencyHistogram;
+	private Histogram myCreateLatencyHistogram;
 
 	private void run(String[] theArgs) throws IOException {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
@@ -116,11 +124,17 @@ public class Benchmarker {
 		myUpdateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "update-", 100);
 		myCreateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "create-", 100);
 
-		myReadMeter = Uploader.newMeter();
-		mySearchMeter = Uploader.newMeter();
-		myUpdateMeter = Uploader.newMeter();
-		myCreateMeter = Uploader.newMeter();
+		myReadThroughputMeter = Uploader.newMeter();
+		myReadLatencyHistogram = Uploader.newHistogram();
+		mySearchThroughputMeter = Uploader.newMeter();
+		mySearchLatencyHistogram = Uploader.newHistogram();
+		myUpdateThroughputMeter = Uploader.newMeter();
+		myUpdateLatencyHistogram = Uploader.newHistogram();
+		myCreateThroughputMeter = Uploader.newMeter();
+		myCreateLatencyHistogram = Uploader.newHistogram();
 		myFailureMeter = Uploader.newMeter();
+		myRequestBytesMeter = Uploader.newMeter();
+		myResponseBytesMeter = Uploader.newMeter();
 
 		mySw = new StopWatch();
 
@@ -140,26 +154,14 @@ public class Benchmarker {
 			"TotalSearch, AllTimeSearchPerSec, MovingAvgSearchPerSec, " +
 			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, " +
 			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, " +
-			"TotalFailures, MovingAvgFailuresPerSec" +
+			"TotalFailures, MovingAvgFailuresPerSec, " +
+			"MovingAvgRequestBytesPerSec, MovingAvgResponseBytesPerSec" +
 			"\n");
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
 	}
 
-	private void test() throws IOException {
-		CloseableHttpClient httpClient = Uploader.createHttpClient();
-
-		HttpGet request = new HttpGet("http://localhost:8002");
-		try (var resp = httpClient.execute(request)) {
-			ourLog.info("Resp: {}", IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8));
-		}
-		try (var resp = httpClient.execute(request)) {
-			ourLog.info("Resp: {}", IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8));
-		}
-
-		System.exit(0);
-	}
 
 	private void loadData(int theMegascaleDbCount) {
 		int idsPerMegaScaleDb = 1000 / theMegascaleDbCount;
@@ -275,6 +277,15 @@ public class Benchmarker {
 		new Benchmarker().run(theArgs);
 	}
 
+	private static long consumeStream(InputStream is) throws IOException {
+		long retVal = 0;
+		if (is != null) {
+			retVal = IOUtils.consume(is);
+			is.close();
+		}
+		return retVal;
+	}
+
 	private class ReadTask extends BaseTaskCreator {
 
 
@@ -286,28 +297,24 @@ public class Benchmarker {
 		protected void run(int thePatientIndex, IIdType thePatientId) {
 			String url = thePatientId.getValue();
 			HttpGet get = new HttpGet(url);
+			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
 				if (response.getStatusLine().getStatusCode() == 200) {
-					myReadMeter.mark();
+					myReadThroughputMeter.mark();
 					myReadCount.incrementAndGet();
+					myReadLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
 					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				consumeStream(response.getEntity().getContent());
+				long bytes = consumeStream(response.getEntity().getContent());
+				myResponseBytesMeter.mark(bytes);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
-		}
-	}
-
-	private static void consumeStream(InputStream is) throws IOException {
-		if (is != null) {
-			IOUtils.consume(is);
-			is.close();
 		}
 	}
 
@@ -322,16 +329,19 @@ public class Benchmarker {
 		protected void run(int thePatientIndex, IIdType thePatientId) {
 			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1";
 			HttpGet get = new HttpGet(url);
+			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
 				if (response.getStatusLine().getStatusCode() == 200) {
-					mySearchMeter.mark();
+					mySearchThroughputMeter.mark();
 					mySearchCount.incrementAndGet();
+					mySearchLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
 					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				consumeStream(response.getEntity().getContent());
+				long bytes = consumeStream(response.getEntity().getContent());
+				myResponseBytesMeter.mark(bytes);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -354,23 +364,25 @@ public class Benchmarker {
 			int newIdx = (int) (Math.random() * ENCOUNTER_STATUSES.length);
 			encounter.setStatus(ENCOUNTER_STATUSES[newIdx]);
 			String newPayload = ourCtx.newJsonParser().encodeToString(encounter);
-
+			myRequestBytesMeter.mark(newPayload.length());
 
 			String url = myGatewayBaseUrl + "/Encounter/" + theEncounterId.getIdPart();
 			HttpPut put = new HttpPut(url);
 			put.addHeader(HEADER_PREFER, HEADER_PREFER_RETURN + "=" + HEADER_PREFER_RETURN_MINIMAL);
 			put.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
+			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(put)) {
 				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
-					myUpdateMeter.mark();
+					myUpdateThroughputMeter.mark();
 					myUpdateCount.incrementAndGet();
+					myUpdateLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
 					if (response.getStatusLine().getStatusCode() == 409) {
 						// This means two threads tried to update the same resource, and this
 						// is expected in a high-stress benchmark, so we consider this a success
 						// since the server behaved appropriately
-						myUpdateMeter.mark();
+						myUpdateThroughputMeter.mark();
 						myUpdateCount.incrementAndGet();
 					} else {
 						ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), response);
@@ -378,7 +390,8 @@ public class Benchmarker {
 						myFailureCount.incrementAndGet();
 					}
 				}
-				consumeStream(response.getEntity().getContent());
+				long bytes = consumeStream(response.getEntity().getContent());
+				myResponseBytesMeter.mark(bytes);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -405,23 +418,27 @@ public class Benchmarker {
 			obs.setStatus(Observation.ObservationStatus.FINAL);
 			obs.setValue(new StringType("This is the value"));
 			String newPayload = ourCtx.newJsonParser().encodeToString(obs);
+			myRequestBytesMeter.mark(newPayload.length());
 
 			String url = myGatewayBaseUrl + "/Observation";
 			HttpPost post = new HttpPost(url);
 			post.addHeader(HEADER_PREFER, HEADER_PREFER_RETURN + "=" + HEADER_PREFER_RETURN_MINIMAL);
 			post.setEntity(new StringEntity(newPayload, CONTENT_TYPE_FHIR_JSON));
 
+			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(post)) {
 				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 201) {
-					myCreateMeter.mark();
+					myCreateThroughputMeter.mark();
 					myCreateCount.incrementAndGet();
+					myCreateLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
 					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
 					ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				consumeStream(response.getEntity().getContent());
+				long bytes = consumeStream(response.getEntity().getContent());
+				myResponseBytesMeter.mark(bytes);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -460,34 +477,44 @@ public class Benchmarker {
 		public void run() {
 			long totalRead = myReadCount.get();
 			long allTimeRead = (long) mySw.getThroughput(totalRead, TimeUnit.SECONDS);
-			long perSecondRead = ((long) myReadMeter.getOneMinuteRate()) / 60L;
+			long perSecondRead = ((long) myReadThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerRead = (long) myReadLatencyHistogram.getSnapshot().getMean();
 
 			long totalSearch = mySearchCount.get();
 			long allTimeSearch = (long) mySw.getThroughput(totalSearch, TimeUnit.SECONDS);
-			long perSecondSearch = ((long) mySearchMeter.getOneMinuteRate()) / 60L;
+			long perSecondSearch = ((long) mySearchThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerSearch = (long) mySearchLatencyHistogram.getSnapshot().getMean();
 
 			long totalUpdate = myUpdateCount.get();
 			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
-			long perSecondUpdate = ((long) myUpdateMeter.getOneMinuteRate()) / 60L;
+			long perSecondUpdate = ((long) myUpdateThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerUpdate = (long) myUpdateLatencyHistogram.getSnapshot().getMean();
 
 			long totalCreate = myCreateCount.get();
 			long allTimeCreate = (long) mySw.getThroughput(totalCreate, TimeUnit.SECONDS);
-			long perSecondCreate = ((long) myCreateMeter.getOneMinuteRate()) / 60L;
+			long perSecondCreate = ((long) myCreateThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerCreate = (long) myCreateLatencyHistogram.getSnapshot().getMean();
 
+			long perSecondSuccess = perSecondRead + perSecondSearch + perSecondCreate + perSecondUpdate;
 			long totalFail = myFailureCount.get();
 			long perSecondFail = (long) (myFailureMeter.getOneMinuteRate() / 60L);
 
+			long requestBytesPerSec = (long) (myRequestBytesMeter.getOneMinuteRate() / 60L);
+			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
+
 			ourLog.info(
-				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec] " +
-					"\nFAIL[ Total {} - MovAvg {}/sec]",
-				totalRead, allTimeRead, perSecondRead,
-				totalSearch, allTimeSearch, perSecondSearch,
-				totalUpdate, allTimeUpdate, perSecondUpdate,
-				totalCreate, allTimeCreate, perSecondCreate,
-				totalFail, perSecondFail
+				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
+					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
+					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
+					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
+					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec]" +
+					"\nREQ[ {} /sec] -- RESP[ {} /sec]",
+				totalRead, allTimeRead, perSecondRead, avgMillisPerRead,
+				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch,
+				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate,
+				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate,
+				perSecondSuccess, totalFail, perSecondFail,
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
 			);
 
 			long millis = mySw.getMillis();
@@ -500,7 +527,9 @@ public class Benchmarker {
 						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
 						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
 						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
-						totalFail + "," + perSecondFail + "\n"
+						totalFail + "," + perSecondFail + "," +
+						requestBytesPerSec + "," + responseBytesPerSec +
+						"\n"
 				);
 				myCsvWriter.flush();
 			} catch (Exception e) {
