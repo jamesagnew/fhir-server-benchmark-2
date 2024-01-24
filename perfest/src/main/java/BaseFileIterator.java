@@ -11,9 +11,11 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -28,12 +30,24 @@ public abstract class BaseFileIterator {
 
 	protected void processFilesInDirectory(File sourceDir, int threadCount, int theStartIndex) throws Exception {
 		ourLog.info("Scanning directory for files...");
-		List<File> files = FileUtils
+		StopWatch fileSw = new StopWatch();
+		Iterator<File> fileIterator = FileUtils
 			.streamFiles(sourceDir, true, "gz")
 			.sorted(comparing(File::getName))
-			.collect(Collectors.toList());
+			.iterator();
+
+		List<File> files = new ArrayList<>();
+		int size = 0;
+		while (fileIterator.hasNext()) {
+			files.add(fileIterator.next());
+			if (++size % 100000 == 0) {
+				ourLog.info(" * Found {} files ({}/sec)", size, fileSw.getThroughput(size, TimeUnit.SECONDS));
+			}
+		}
+
 		myTotalFiles = files.size();
-		ourLog.info("Have {} files", files.size());
+
+		ourLog.info("Finished scanning directory, have {} files", files.size());
 
 		ThreadPoolTaskExecutor threadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "worker-", 100);
 

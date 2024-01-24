@@ -3,6 +3,7 @@
 The following is a list of files in this repository that need to be configured in the real environment:
 
 * smilecdr-write/classes/cdr-config-Write.properties - Config for the write node
+* smilecdr-write/classes/config_seeding/fhir-partitions.json - Partition seeding file (edit this if we need more than 4 megascale DBs)
 * smilecdr-read/classes/cdr-config-Write.properties - Config for the read node
 * smilecdr-gateway/classes/cdr-config-Gateway.properties - Config for the gateway node
 * smilecdr-gateway/customerlib/logback-smile-custom.xml - Custom logback that reduces logging
@@ -16,6 +17,37 @@ cd interceptors
 mvn clean install
 ```
 
+# Configuring MegaScale
+
+The `BenchmarkMegaScaleConnectionProvidingInterceptor` handles providing MegaScale connections. It uses environment variables to supply them. The following example shows how to set these within the `setenv` file, but this can also be done by passing the same properties in as Docker Env variables.
+
+```bash
+# How many megascale DBa are there
+JVMARGS="$JVMARGS -DMEGASCALE_COUNT=2"
+
+# Coordinates of MegaScale DB 1 (note that these are 1-indexed, not 0-indexed!)
+JVMARGS="$JVMARGS -DMEGASCALE_URL_1=jdbc:postgresql://localhost:5432/cdr_ms1"
+JVMARGS="$JVMARGS -DMEGASCALE_USER_1=cdr_ms1"
+JVMARGS="$JVMARGS -DMEGASCALE_PASS_1=cdr"
+
+# Coordinates of MegaScale DB 2
+JVMARGS="$JVMARGS -DMEGASCALE_URL_2=jdbc:postgresql://localhost:5432/cdr_ms2"
+JVMARGS="$JVMARGS -DMEGASCALE_USER_2=cdr_ms2"
+JVMARGS="$JVMARGS -DMEGASCALE_PASS_2=cdr"
+```
+
+If you are using environment variables, use the same names and make sure to omit the "D". So for example:
+
+```properties
+MEGASCALE_COUNT=2
+
+# Coordinates of MegaScale DB 1 (note that these are 1-indexed, not 0-indexed!)
+MEGASCALE_URL_1=jdbc:postgresql://localhost:5432/cdr_ms1
+MEGASCALE_USER_1=cdr_ms1
+MEGASCALE_PASS_1=cdr
+
+...etc…
+```
 
 # Running The Benchmark
 

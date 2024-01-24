@@ -1,0 +1,24 @@
+{
+  "partitions" : [
+    {
+      "id" : 1,
+      "name" : "MS1",
+      "description" : "MegaScale 1"
+    },
+    {
+      "id" : 2,
+      "name" : "MS2",
+      "description" : "MegaScale 2"
+    },
+    {
+      "id" : 3,
+      "name" : "MS3",
+      "description" : "MegaScale 3"
+    },
+    {
+      "id" : 4,
+      "name" : "MS4",
+      "description" : "MegaScale 4"
+    }
+  ]
+}
