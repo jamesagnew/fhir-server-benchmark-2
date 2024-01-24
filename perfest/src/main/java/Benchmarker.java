@@ -34,6 +34,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -96,10 +97,6 @@ public class Benchmarker {
 	private FileWriter myCsvWriter;
 
 	private void run(String[] theArgs) throws IOException {
-//		if (true) {
-//			test();
-//		}
-
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
 		Validate.isTrue(theArgs.length == 4, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
@@ -298,11 +295,19 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
+				consumeStream(response.getEntity().getContent());
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
+		}
+	}
+
+	private static void consumeStream(InputStream is) throws IOException {
+		if (is != null) {
+			IOUtils.consume(is);
+			is.close();
 		}
 	}
 
@@ -326,6 +331,7 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
+				consumeStream(response.getEntity().getContent());
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -372,6 +378,7 @@ public class Benchmarker {
 						myFailureCount.incrementAndGet();
 					}
 				}
+				consumeStream(response.getEntity().getContent());
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -414,6 +421,7 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
+				consumeStream(response.getEntity().getContent());
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
