@@ -19,7 +19,6 @@ import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.Validate;
 
-import static com.smilecdr.demo.benchmark2.BenchmarkConstants.MEGASCALE_COUNT;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
@@ -56,17 +55,6 @@ public class BenchmarkMegaScaleConnectionProvidingInterceptor {
 		}
 	}
 
-	private String getPropertyNotNull(String thePropertyName) {
-		String retVal = System.getProperty(thePropertyName);
-		if (isBlank(retVal)) {
-			retVal = System.getenv(thePropertyName);
-			if (isBlank(retVal)) {
-				throw new ConfigurationException("No value for env variable: " + thePropertyName);
-			}
-		}
-		return retVal;
-	}
-
 	@CdrHook(CdrPointcut.STORAGE_MEGASCALE_PROVIDE_DB_INFO)
 	public MegaScaleCredentialResponseJson provideMegaScaleCredentials(MegaScaleCredentialRequestJson theRequest) {
 
@@ -94,6 +82,17 @@ public class BenchmarkMegaScaleConnectionProvidingInterceptor {
 		retVal.setDatabaseUrl(myUrls[partitionNumber - 1]);
 		retVal.setDatabaseUsername(myUsers[partitionNumber - 1]);
 		retVal.setDatabasePassword(myPasswords[partitionNumber - 1]);
+		return retVal;
+	}
+
+	static String getPropertyNotNull(String thePropertyName) {
+		String retVal = System.getProperty(thePropertyName);
+		if (isBlank(retVal)) {
+			retVal = System.getenv(thePropertyName);
+			if (isBlank(retVal)) {
+				throw new ConfigurationException("No value for env variable: " + thePropertyName);
+			}
+		}
 		return retVal;
 	}
 

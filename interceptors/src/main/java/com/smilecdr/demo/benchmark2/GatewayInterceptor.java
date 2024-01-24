@@ -6,13 +6,10 @@ import ca.cdr.api.fhirgw.json.GatewayTargetJson;
 import ca.cdr.api.fhirgw.model.CreateRequest;
 import ca.cdr.api.fhirgw.model.SearchRequest;
 import ca.cdr.api.fhirgw.model.TransactionRequest;
-import ca.cdr.api.fhirgw.model.UpdateRequest;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
-import com.apicatalog.jsonld.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Encounter;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Patient;
@@ -20,8 +17,15 @@ import org.hl7.fhir.r4.model.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.smilecdr.demo.benchmark2.BenchmarkMegaScaleConnectionProvidingInterceptor.getPropertyNotNull;
+
 public class GatewayInterceptor {
 	private static final Logger ourLog = LoggerFactory.getLogger(GatewayInterceptor.class);
+	private final int myMegaScaleCount;
+
+	public GatewayInterceptor() {
+		myMegaScaleCount = Integer.parseInt(getPropertyNotNull("MEGASCALE_COUNT"));
+	}
 
 	@CdrHook(CdrPointcut.FHIRGW_SEARCH_TARGET_PREINVOKE)
 	public void searchSelectRoute(SearchRequest theRequest, GatewayTargetJson theTarget) {
@@ -78,10 +82,10 @@ public class GatewayInterceptor {
 	}
 
 
-	private static int patientIdToPartitionId(String patientIdRaw) {
+	private int patientIdToPartitionId(String patientIdRaw) {
 		String patientId = new IdType(patientIdRaw).getIdPart();
 		Validate.notBlank(patientId, "No patient ID provided");
-		int partition = Math.abs(patientId.hashCode() % BenchmarkConstants.MEGASCALE_COUNT) + 1;
+		int partition = Math.abs(patientId.hashCode() % myMegaScaleCount) + 1;
 		return partition;
 	}
 
