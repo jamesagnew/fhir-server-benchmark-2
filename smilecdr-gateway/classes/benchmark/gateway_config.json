@@ -55,36 +55,260 @@
     "baseUrl" : "http://localhost:8001/MS2",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms3",
+    "baseUrl" : "http://localhost:8000/MS3",
+    "resourceIdPrefix" : "ms3-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms3",
+    "baseUrl" : "http://localhost:8001/MS3",
+    "resourceIdPrefix" : "ms3-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms3-noprefix",
+    "baseUrl" : "http://localhost:8000/MS3",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms3-noprefix",
+    "baseUrl" : "http://localhost:8001/MS3",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms4",
+    "baseUrl" : "http://localhost:8000/MS4",
+    "resourceIdPrefix" : "ms4-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms4",
+    "baseUrl" : "http://localhost:8001/MS4",
+    "resourceIdPrefix" : "ms4-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms4-noprefix",
+    "baseUrl" : "http://localhost:8000/MS4",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms4-noprefix",
+    "baseUrl" : "http://localhost:8001/MS4",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms5",
+    "baseUrl" : "http://localhost:8000/MS5",
+    "resourceIdPrefix" : "ms5-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms5",
+    "baseUrl" : "http://localhost:8001/MS5",
+    "resourceIdPrefix" : "ms5-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms5-noprefix",
+    "baseUrl" : "http://localhost:8000/MS5",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms5-noprefix",
+    "baseUrl" : "http://localhost:8001/MS5",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms6",
+    "baseUrl" : "http://localhost:8000/MS6",
+    "resourceIdPrefix" : "ms6-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms6",
+    "baseUrl" : "http://localhost:8001/MS6",
+    "resourceIdPrefix" : "ms6-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms6-noprefix",
+    "baseUrl" : "http://localhost:8000/MS6",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms6-noprefix",
+    "baseUrl" : "http://localhost:8001/MS6",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms7",
+    "baseUrl" : "http://localhost:8000/MS7",
+    "resourceIdPrefix" : "ms7-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms7",
+    "baseUrl" : "http://localhost:8001/MS7",
+    "resourceIdPrefix" : "ms7-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms7-noprefix",
+    "baseUrl" : "http://localhost:8000/MS7",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms7-noprefix",
+    "baseUrl" : "http://localhost:8001/MS7",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms8",
+    "baseUrl" : "http://localhost:8000/MS8",
+    "resourceIdPrefix" : "ms8-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms8",
+    "baseUrl" : "http://localhost:8001/MS8",
+    "resourceIdPrefix" : "ms8-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms8-noprefix",
+    "baseUrl" : "http://localhost:8000/MS8",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms8-noprefix",
+    "baseUrl" : "http://localhost:8001/MS8",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms9",
+    "baseUrl" : "http://localhost:8000/MS9",
+    "resourceIdPrefix" : "ms9-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms9",
+    "baseUrl" : "http://localhost:8001/MS9",
+    "resourceIdPrefix" : "ms9-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms9-noprefix",
+    "baseUrl" : "http://localhost:8000/MS9",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms9-noprefix",
+    "baseUrl" : "http://localhost:8001/MS9",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms10",
+    "baseUrl" : "http://localhost:8000/MS10",
+    "resourceIdPrefix" : "ms10-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms10",
+    "baseUrl" : "http://localhost:8001/MS10",
+    "resourceIdPrefix" : "ms10-",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Write-ms10-noprefix",
+    "baseUrl" : "http://localhost:8000/MS10",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-ms10-noprefix",
+    "baseUrl" : "http://localhost:8001/MS10",
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
   } ],
   "searchRoutes" : [ {
     "id" : "search",
-    "resourceTypes" : [ "Patient", "Encounter", "Observation" ],
+    "resourceTypes" : [ "Encounter", "Observation", "Patient" ],
     "targets" : [ {
       "targetId" : "Read-ms1"
     }, {
       "targetId" : "Read-ms2"
+    }, {
+      "targetId" : "Read-ms3"
+    }, {
+      "targetId" : "Read-ms4"
+    }, {
+      "targetId" : "Read-ms5"
+    }, {
+      "targetId" : "Read-ms6"
+    }, {
+      "targetId" : "Read-ms7"
+    }, {
+      "targetId" : "Read-ms8"
+    }, {
+      "targetId" : "Read-ms9"
+    }, {
+      "targetId" : "Read-ms10"
     } ],
     "parallel" : false
   } ],
   "readRoutes" : [ {
     "id" : "read",
-    "resourceTypes" : [ "Patient", "Encounter", "Observation" ],
+    "resourceTypes" : [ "Encounter", "Observation", "Patient" ],
     "targets" : [ {
       "targetId" : "Read-ms1"
     }, {
       "targetId" : "Read-ms2"
+    }, {
+      "targetId" : "Read-ms3"
+    }, {
+      "targetId" : "Read-ms4"
+    }, {
+      "targetId" : "Read-ms5"
+    }, {
+      "targetId" : "Read-ms6"
+    }, {
+      "targetId" : "Read-ms7"
+    }, {
+      "targetId" : "Read-ms8"
+    }, {
+      "targetId" : "Read-ms9"
+    }, {
+      "targetId" : "Read-ms10"
     } ],
     "parallel" : false
   } ],
   "updateRoutes" : [ {
     "id" : "update",
-    "resourceTypes" : [ "Patient", "Observation", "Encounter", "SearchParameter" ],
+    "resourceTypes" : [ "Encounter", "SearchParameter", "Patient", "Observation" ],
     "targets" : [ {
       "targetId" : "Write-def"
     }, {
       "targetId" : "Write-ms1"
     }, {
       "targetId" : "Write-ms2"
+    }, {
+      "targetId" : "Write-ms3"
+    }, {
+      "targetId" : "Write-ms4"
+    }, {
+      "targetId" : "Write-ms5"
+    }, {
+      "targetId" : "Write-ms6"
+    }, {
+      "targetId" : "Write-ms7"
+    }, {
+      "targetId" : "Write-ms8"
+    }, {
+      "targetId" : "Write-ms9"
+    }, {
+      "targetId" : "Write-ms10"
     } ],
     "parallel" : false
   } ],
@@ -95,6 +319,22 @@
       "targetId" : "Write-ms1"
     }, {
       "targetId" : "Write-ms2"
+    }, {
+      "targetId" : "Write-ms3"
+    }, {
+      "targetId" : "Write-ms4"
+    }, {
+      "targetId" : "Write-ms5"
+    }, {
+      "targetId" : "Write-ms6"
+    }, {
+      "targetId" : "Write-ms7"
+    }, {
+      "targetId" : "Write-ms8"
+    }, {
+      "targetId" : "Write-ms9"
+    }, {
+      "targetId" : "Write-ms10"
     } ],
     "parallel" : false
   } ],
@@ -104,6 +344,22 @@
       "targetId" : "Write-ms1-noprefix"
     }, {
       "targetId" : "Write-ms2-noprefix"
+    }, {
+      "targetId" : "Write-ms3-noprefix"
+    }, {
+      "targetId" : "Write-ms4-noprefix"
+    }, {
+      "targetId" : "Write-ms5-noprefix"
+    }, {
+      "targetId" : "Write-ms6-noprefix"
+    }, {
+      "targetId" : "Write-ms7-noprefix"
+    }, {
+      "targetId" : "Write-ms8-noprefix"
+    }, {
+      "targetId" : "Write-ms9-noprefix"
+    }, {
+      "targetId" : "Write-ms10-noprefix"
     } ],
     "parallel" : false
   } ]

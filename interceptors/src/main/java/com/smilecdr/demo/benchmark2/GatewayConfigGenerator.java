@@ -22,10 +22,15 @@ public class GatewayConfigGenerator {
 
 		GatewayConfigurationJson config = new GatewayConfigurationJson();
 
+		// It doesn't really matter if we create routes for more megascale DBs than
+		// we actually have, since the target servers will be ok with whatever
+		// we do.
+		int megascaleCount = 10;
+		
 		// Add targets
         addTarget(config, "Write", "def", "8000", "DEFAULT", true);
         addTarget(config, "Read", "def", "8001", "DEFAULT", true);
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			addTarget(config, "Write", "ms" + i, "8000", "MS" + i, true);
 			addTarget(config, "Read", "ms" + i, "8001", "MS" + i, true);
 			addTarget(config, "Write", "ms" + i, "8000", "MS" + i, false);
@@ -37,7 +42,7 @@ public class GatewayConfigGenerator {
 		searchRoute.setId("search");
 		searchRoute.setParallel(false);
 		searchRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
 
@@ -46,7 +51,7 @@ public class GatewayConfigGenerator {
 		readRoute.setId("read");
 		readRoute.setParallel(false);
 		readRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			readRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
 
@@ -56,7 +61,7 @@ public class GatewayConfigGenerator {
 		updateRoute.setParallel(false);
 		updateRoute.setResourceTypes(Set.of("SearchParameter", "Patient", "Observation", "Encounter"));
 		updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-def"));
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i));
 		}
 
@@ -64,14 +69,14 @@ public class GatewayConfigGenerator {
 		GatewayCreateRouteJson create = config.addCreateRoute();
 		create.setId("create");
 		create.addResourceType("Observation");
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			create.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i));
 		}
 
 		// Transaction Route
 		GatewayTransactionRouteJson transaction = config.addTransactionRoute();
 		transaction.setId("transaction");
-		for (int i = 1; i <= BenchmarkConstants.MEGASCALE_COUNT; i++) {
+		for (int i = 1; i <= megascaleCount; i++) {
 			transaction.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i + "-noprefix"));
 		}
 
