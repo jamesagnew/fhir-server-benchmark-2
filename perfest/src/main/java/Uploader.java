@@ -75,15 +75,17 @@ public class Uploader extends BaseFileIterator {
 		int errors = 0;
 		while (true) {
 			try (CloseableHttpResponse resp = myClient.execute(request)) {
-				if (resp.getStatusLine().getStatusCode() != 200) {
-					String respContent = IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8);
-					ourLog.warn("Failure in File[{}] HTTP {}: {}", theFile.getName(), resp.getStatusLine().getStatusCode(), respContent);
-					errors++;
-				} else {
-					myRetryCount.addAndGet(errors);
-					break;
-				}
-			} catch (Exception e) {
+                if (resp.getStatusLine().getStatusCode() == 200) {
+                    if (errors > 0) {
+						myRetryCount.addAndGet(errors);
+					}
+                    break;
+                } else {
+                    String respContent = IOUtils.toString(resp.getEntity().getContent(), StandardCharsets.UTF_8);
+                    ourLog.warn("Failure in File[{}] HTTP {}: {}", theFile.getName(), resp.getStatusLine().getStatusCode(), respContent);
+                    errors++;
+                }
+            } catch (Exception e) {
 				ourLog.warn("Failure in File[{}]: {} - Cause {}", theFile.getName(), e, e.getCause() != null ? e.getCause().toString() : null);
 				errors++;
 			}
