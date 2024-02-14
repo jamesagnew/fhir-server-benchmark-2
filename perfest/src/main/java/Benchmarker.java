@@ -295,7 +295,7 @@ public class Benchmarker {
 
 		@Override
 		protected void run(int thePatientIndex, IIdType thePatientId) {
-			String url = thePatientId.getValue();
+			String url = thePatientId.getValue() + "?_elements=id&_elements:exclude=Patient.meta";
 			HttpGet get = new HttpGet(url);
 			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
@@ -327,7 +327,7 @@ public class Benchmarker {
 
 		@Override
 		protected void run(int thePatientIndex, IIdType thePatientId) {
-			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1";
+			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1&_elements=id&_elements:exclude=Observation.meta";
 			HttpGet get = new HttpGet(url);
 			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {

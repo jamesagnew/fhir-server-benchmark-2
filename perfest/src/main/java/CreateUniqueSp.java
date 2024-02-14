@@ -67,6 +67,8 @@ public class CreateUniqueSp {
 		uniqueSp.setId("def-sp-" + base + "-identifier-uniq");
 		uniqueSp.setType(Enumerations.SearchParamType.COMPOSITE);
 		uniqueSp.setStatus(Enumerations.PublicationStatus.ACTIVE);
+		uniqueSp.setCode("identifier-unique");
+		uniqueSp.setName("identifier-unique");
 		uniqueSp.addBase(base);
 		uniqueSp.addComponent()
 			.setExpression(base + ".identifier")

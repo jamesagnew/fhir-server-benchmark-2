@@ -54,8 +54,8 @@ public class GatewayInterceptor {
 
 		Observation obs = (Observation) theRequest.getResource();
 		String patientIdRaw = obs.getSubject().getReference();
-		if (patientIdRaw == null) {
-			throw new InvalidRequestException("No subject specified");
+		if (!patientIdRaw.startsWith("Patient/ms") || !patientIdRaw.contains("-")) {
+			throw new InvalidRequestException("Invalid subject specified provided: " + patientIdRaw);
 		}
 
 		String partitionId = patientIdRaw.substring("Patient/ms".length(), patientIdRaw.indexOf('-'));
