@@ -50,6 +50,9 @@ public class CreateUniqueSp {
 
         SearchParameter practitionerUniqueSp = createUniqueIdentifierSearchParameter("Practitioner");
 		uploadUniqueIdentifierSearchParameter("Practitioner", client, practitionerUniqueSp);
+
+        SearchParameter locationUniqueSp = createUniqueIdentifierSearchParameter("Location");
+		uploadUniqueIdentifierSearchParameter("Location", client, locationUniqueSp);
 	}
 
 	private static void uploadUniqueIdentifierSearchParameter(String base, IGenericClient client, SearchParameter uniqueSp) {
