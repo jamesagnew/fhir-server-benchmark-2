@@ -5,15 +5,12 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -33,7 +30,7 @@ public class StaticResourcePerfTest {
 		myUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		int threadCount = Integer.parseInt(theArgs[1]);
 
-		ourClient = Uploader.createHttpClient();
+		ourClient = Uploader.createHttpClient(true);
 		ThreadPoolTaskExecutor threadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "worker-", 100);
 
 		myReadThroughputMeter = Uploader.newMeter();

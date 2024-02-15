@@ -41,6 +41,7 @@ public class GatewayConfigGenerator {
 		GatewaySearchRouteJson searchRoute = config.addSearchRoute();
 		searchRoute.setId("search");
 		searchRoute.setParallel(false);
+		searchRoute.setDisablePaging(true);
 		searchRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
 		for (int i = 1; i <= megascaleCount; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));

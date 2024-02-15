@@ -77,7 +77,6 @@ public class Benchmarker {
 	private ThreadPoolTaskExecutor mySearchThreadPool;
 	private ThreadPoolTaskExecutor myUpdateThreadPool;
 	private ThreadPoolTaskExecutor myCreateThreadPool;
-	private CloseableHttpClient myHttpClient;
 	private ReadTask myReadTask;
 	private String myGatewayBaseUrl;
 	private AtomicLong myFailureCount = new AtomicLong(0);
@@ -103,19 +102,20 @@ public class Benchmarker {
 	private Histogram mySearchLatencyHistogram;
 	private Histogram myUpdateLatencyHistogram;
 	private Histogram myCreateLatencyHistogram;
+	private boolean myCompression;
 
 	private void run(String[] theArgs) throws IOException {
-		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count]";
-		Validate.isTrue(theArgs.length == 4, syntaxMsg);
+		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false]";
+		Validate.isTrue(theArgs.length == 5, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
 		int megascaleDbCount = Integer.parseInt(theArgs[2]);
 		int threadCount = Integer.parseInt(theArgs[3]);
+		myCompression = Boolean.parseBoolean(theArgs[4]);
 
 		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
 		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
-		myHttpClient = Uploader.createHttpClient();
 		ourLog.info("Benchmarker starting with {} thread count", threadCount);
 		loadData(megascaleDbCount);
 
@@ -288,6 +288,7 @@ public class Benchmarker {
 
 	private class ReadTask extends BaseTaskCreator {
 
+		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 		public ReadTask(ThreadPoolTaskExecutor theThreadPool) {
 			super(theThreadPool, myPatientIds);
@@ -319,6 +320,7 @@ public class Benchmarker {
 	}
 
 	private class SearchTask extends BaseTaskCreator {
+		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
 		public SearchTask(ThreadPoolTaskExecutor theThreadPool) {
@@ -351,6 +353,7 @@ public class Benchmarker {
 	}
 
 	private class UpdateTask extends BaseTaskCreator {
+		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
 		public UpdateTask(ThreadPoolTaskExecutor theThreadPool) {
@@ -402,6 +405,7 @@ public class Benchmarker {
 
 	private class CreateTask extends BaseTaskCreator {
 
+		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 		public CreateTask(ThreadPoolTaskExecutor theThreadPool) {
 			super(theThreadPool, myPatientIds);

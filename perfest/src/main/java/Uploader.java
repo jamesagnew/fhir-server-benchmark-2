@@ -60,7 +60,7 @@ public class Uploader extends BaseFileIterator {
 		int startIndex = Integer.parseInt(args[3]);
 
 		ourLog.info("Starting {} thread uploader from directory {}", threadCount, sourceDir.getAbsolutePath());
-		myClient = createHttpClient();
+		myClient = createHttpClient(true);
 
 		processFilesInDirectory(sourceDir, threadCount, startIndex);
 
@@ -140,7 +140,7 @@ public class Uploader extends BaseFileIterator {
 		new Uploader().run(args);
 	}
 
-	public static CloseableHttpClient createHttpClient() {
+	public static CloseableHttpClient createHttpClient(boolean theCompression) {
 		PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(600, TimeUnit.SECONDS);
 		connectionManager.setMaxTotal(10000);
 		connectionManager.setDefaultMaxPerRoute(10000);
@@ -157,11 +157,12 @@ public class Uploader extends BaseFileIterator {
 			.setConnectionReuseStrategy(new DefaultClientConnectionReuseStrategy())
 			.setConnectionManager(connectionManager);
 
+		if (!theCompression) {
+			builder.disableContentCompression();
+		}
+
 		HttpRequestInterceptor auth = new HttpBasicAuthInterceptor("admin", "password");
 		builder.addInterceptorFirst(auth);
-
-//		HttpRequestInterceptor gzip;
-//		builder.addInterceptorFirst(gzip);
 
         return builder.build();
 	}
