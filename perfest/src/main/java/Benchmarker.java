@@ -12,6 +12,8 @@ import com.codahale.metrics.Meter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
+import org.apache.http.Header;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -44,6 +46,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -52,6 +55,7 @@ import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER;
 import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN;
 import static ca.uhn.fhir.rest.api.Constants.HEADER_PREFER_RETURN_MINIMAL;
 import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
+import static org.apache.commons.lang3.StringUtils.startsWith;
 
 public class Benchmarker {
 	public static final ContentType CONTENT_TYPE_FHIR_JSON = ContentType.create(Constants.CT_FHIR_JSON_NEW, StandardCharsets.UTF_8);
@@ -69,6 +73,10 @@ public class Benchmarker {
 	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
 	private static final FhirContext ourCtx = FhirContext.forR4Cached();
 	private static final int PATIENT_COUNT = 1000;
+	private final Semaphore myReadSemaphore;
+	private final Semaphore mySearchSemaphore;
+	private final Semaphore myUpdateSemaphore;
+	private final Semaphore myCreateSemaphore;
 	private IGenericClient myGatewayFhirClient;
 	private List<IIdType> myPatientIds = new ArrayList<>();
 	private List<IIdType> myEncounterIds = new ArrayList<>();
@@ -81,6 +89,8 @@ public class Benchmarker {
 	private String myGatewayBaseUrl;
 	private AtomicLong myFailureCount = new AtomicLong(0);
 	private AtomicLong myReadCount = new AtomicLong(0);
+	private AtomicLong myCacheHitCount = new AtomicLong(0);
+	private AtomicLong myCacheMissCount = new AtomicLong(0);
 	private AtomicLong mySearchCount = new AtomicLong(0);
 	private AtomicLong myUpdateCount = new AtomicLong(0);
 	private AtomicLong myCreateCount = new AtomicLong(0);
@@ -104,8 +114,9 @@ public class Benchmarker {
 	private Histogram myCreateLatencyHistogram;
 	private boolean myCompression;
 	private int myThreadCount;
+	private int myActiveThreadCount;
 
-	private void run(String[] theArgs) throws IOException {
+	private Benchmarker(String[] theArgs) throws IOException {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false]";
 		Validate.isTrue(theArgs.length == 5, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
@@ -125,6 +136,13 @@ public class Benchmarker {
 		myUpdateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "update-", 100);
 		myCreateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "create-", 100);
 
+		myReadSemaphore = new Semaphore(myThreadCount, false);
+		mySearchSemaphore = new Semaphore(myThreadCount, false);
+		myUpdateSemaphore = new Semaphore(myThreadCount, false);
+		myCreateSemaphore = new Semaphore(myThreadCount, false);
+
+		addSemaphores(myThreadCount);
+
 		myReadThroughputMeter = Uploader.newMeter();
 		myReadLatencyHistogram = Uploader.newHistogram();
 		mySearchThroughputMeter = Uploader.newMeter();
@@ -139,13 +157,13 @@ public class Benchmarker {
 
 		mySw = new StopWatch();
 
-		myReadTask = new ReadTask(myReadThreadPool);
+		myReadTask = new ReadTask(myReadThreadPool, myReadSemaphore);
 		myReadTask.start();
-		mySearchTask = new SearchTask(mySearchThreadPool);
+		mySearchTask = new SearchTask(mySearchThreadPool, mySearchSemaphore);
 		mySearchTask.start();
-		myUpdateTask = new UpdateTask(myUpdateThreadPool);
+		myUpdateTask = new UpdateTask(myUpdateThreadPool, myUpdateSemaphore);
 		myUpdateTask.start();
-		myCreateTask = new CreateTask(myCreateThreadPool);
+		myCreateTask = new CreateTask(myCreateThreadPool, myCreateSemaphore);
 		myCreateTask.start();
 
 		myCsvWriter = new FileWriter("benchmark.csv");
@@ -156,11 +174,20 @@ public class Benchmarker {
 			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, " +
 			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, " +
 			"TotalFailures, MovingAvgFailuresPerSec, " +
-			"MovingAvgRequestBytesPerSec, MovingAvgResponseBytesPerSec" +
+			"MovingAvgRequestBytesPerSec, MovingAvgResponseBytesPerSec, " +
+			"ThreadCountPerOperation" +
 			"\n");
 
 		myLoggerTimer = new Timer();
 		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
+	}
+
+	private void addSemaphores(int theThreadCount) {
+		myReadSemaphore.release(theThreadCount);
+		mySearchSemaphore.release(theThreadCount);
+		myCreateSemaphore.release(theThreadCount);
+		myUpdateSemaphore.release(theThreadCount);
+		myActiveThreadCount += theThreadCount;
 	}
 
 
@@ -291,8 +318,8 @@ public class Benchmarker {
 
 		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
-		public ReadTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool, myPatientIds);
+		public ReadTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
+			super(theThreadPool, theSemaphore, myPatientIds);
 		}
 
 		@Override
@@ -310,8 +337,7 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				long bytes = consumeStream(response.getEntity().getContent());
-				myResponseBytesMeter.mark(bytes);
+				extractCommonValues(response, true);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -324,8 +350,8 @@ public class Benchmarker {
 		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
-		public SearchTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool, myPatientIds);
+		public SearchTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
+			super(theThreadPool, theSemaphore, myPatientIds);
 		}
 
 		@Override
@@ -343,8 +369,7 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				long bytes = consumeStream(response.getEntity().getContent());
-				myResponseBytesMeter.mark(bytes);
+				extractCommonValues(response, true);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -357,8 +382,8 @@ public class Benchmarker {
 		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
-		public UpdateTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool, myEncounterIds);
+		public UpdateTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
+			super(theThreadPool, theSemaphore, myEncounterIds);
 		}
 
 		@Override
@@ -394,8 +419,7 @@ public class Benchmarker {
 						myFailureCount.incrementAndGet();
 					}
 				}
-				long bytes = consumeStream(response.getEntity().getContent());
-				myResponseBytesMeter.mark(bytes);
+				extractCommonValues(response, false);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -408,8 +432,8 @@ public class Benchmarker {
 
 		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
-		public CreateTask(ThreadPoolTaskExecutor theThreadPool) {
-			super(theThreadPool, myPatientIds);
+		public CreateTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
+			super(theThreadPool, theSemaphore, myPatientIds);
 		}
 
 		@Override
@@ -442,8 +466,7 @@ public class Benchmarker {
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
-				long bytes = consumeStream(response.getEntity().getContent());
-				myResponseBytesMeter.mark(bytes);
+				extractCommonValues(response, false);
 			} catch (Exception e) {
 				ourLog.warn("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
@@ -452,13 +475,29 @@ public class Benchmarker {
 		}
 	}
 
+	private void extractCommonValues(CloseableHttpResponse theResponse, boolean theReadOperation) throws IOException {
+		long bytes = consumeStream(theResponse.getEntity().getContent());
+		myResponseBytesMeter.mark(bytes);
+
+		if (theReadOperation) {
+			Header xCache = theResponse.getFirstHeader(Constants.HEADER_X_CACHE);
+			if (xCache != null && startsWith(xCache.getValue(), "HIT")) {
+				myCacheHitCount.incrementAndGet();
+			} else {
+				myCacheMissCount.incrementAndGet();
+			}
+		}
+	}
+
 	private abstract class BaseTaskCreator extends Thread {
 		protected final ThreadPoolTaskExecutor myThreadPool;
 		private final List<IIdType> myIdList;
+		private final Semaphore mySemaphore;
 
-		public BaseTaskCreator(ThreadPoolTaskExecutor theThreadPool, List<IIdType> theIdList) {
+		public BaseTaskCreator(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore, List<IIdType> theIdList) {
 			myThreadPool = theThreadPool;
 			myIdList = theIdList;
+			mySemaphore = theSemaphore;
 		}
 
 		@Override
@@ -467,7 +506,18 @@ public class Benchmarker {
 				myThreadPool.submit(() -> {
 					int idIndex = (int) (Math.random() * myIdList.size());
 					IIdType id = myIdList.get(idIndex);
-					run(idIndex, id);
+
+                    try {
+                        mySemaphore.acquire();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+						return;
+                    }
+                    try {
+						run(idIndex, id);
+					} finally {
+						mySemaphore.release();
+					}
 				});
 			}
 		}
@@ -507,19 +557,25 @@ public class Benchmarker {
 			long requestBytesPerSec = (long) (myRequestBytesMeter.getOneMinuteRate() / 60L);
 			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
 
+			double cacheHitCount = myCacheHitCount.get();
+			double cacheMissCount = myCacheMissCount.get();
+			long cacheHitPct = (long) ((cacheHitCount / (cacheMissCount + cacheHitCount)) * 100.0);
+
 			ourLog.info(
 				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
 					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
 					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
 					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
 					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
-					"\nREQ[ {} /sec] -- RESP[ {} /sec]",
-				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myThreadCount,
-				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myThreadCount,
-				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myThreadCount,
-				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myThreadCount,
-				perSecondSuccess, totalFail, perSecondFail, myThreadCount * 4,
-				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
+					"\nREQ[ {} /sec] -- RESP[ {} /sec]" +
+					"\nCACHE_HIT[ {}% ]",
+				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myActiveThreadCount,
+				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myActiveThreadCount,
+				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myActiveThreadCount,
+				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myActiveThreadCount,
+				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
+				cacheHitPct
 			);
 
 			long millis = mySw.getMillis();
@@ -533,7 +589,8 @@ public class Benchmarker {
 						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
 						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
 						totalFail + "," + perSecondFail + "," +
-						requestBytesPerSec + "," + responseBytesPerSec +
+						requestBytesPerSec + "," + responseBytesPerSec + "," +
+						myActiveThreadCount +
 						"\n"
 				);
 				myCsvWriter.flush();

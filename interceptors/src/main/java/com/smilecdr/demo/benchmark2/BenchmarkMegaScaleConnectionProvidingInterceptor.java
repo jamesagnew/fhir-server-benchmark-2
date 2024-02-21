@@ -63,7 +63,7 @@ public class BenchmarkMegaScaleConnectionProvidingInterceptor {
 			response = createCredentialResponse(theRequest.getPartitionId());
 		} else if (!isBlank(theRequest.getPartitionName())) {
 			String partitionName = theRequest.getPartitionName();
-			Validate.isTrue(partitionName.startsWith("MS"));
+			Validate.isTrue(partitionName.startsWith("MS"), "Invalid partition name: %s", partitionName);
 			int partitionNumber = Integer.parseInt(partitionName.substring(2));
 			response = createCredentialResponse(partitionNumber);
 		} else {
@@ -75,8 +75,8 @@ public class BenchmarkMegaScaleConnectionProvidingInterceptor {
 
 	@Nonnull
 	private MegaScaleCredentialResponseJson createCredentialResponse(int partitionNumber) {
-		Validate.isTrue(partitionNumber >= 1);
-		Validate.isTrue(partitionNumber <= myMegaScaleCount);
+		Validate.isTrue(partitionNumber >= 1, "Invalid partition number: %s", partitionNumber);
+		Validate.isTrue(partitionNumber <= myMegaScaleCount, "Invalid partition number %s must be <= %s", partitionNumber, myMegaScaleCount);
 
 		MegaScaleCredentialResponseJson retVal = new MegaScaleCredentialResponseJson();
 		retVal.setDatabaseUrl(myUrls[partitionNumber - 1]);
