@@ -80,7 +80,7 @@ public class Benchmarker {
 	private final List<IIdType> myPatientIds = new ArrayList<>();
 	private final List<IIdType> myEncounterIds = new ArrayList<>();
 	private final Map<String, Encounter> myEncounters = new HashMap<>();
-    private final ReadTask myReadTask;
+	private final ReadTask myReadTask;
 	private final String myGatewayBaseUrl;
 	private final AtomicLong myFailureCount = new AtomicLong(0);
 	private final AtomicLong myReadCount = new AtomicLong(0);
@@ -94,7 +94,7 @@ public class Benchmarker {
 	private final Meter myUpdateThroughputMeter;
 	private final Meter myCreateThroughputMeter;
 	private final Meter myFailureMeter;
-    private final StopWatch mySw;
+	private final StopWatch mySw;
 	private final SearchTask mySearchTask;
 	private final UpdateTask myUpdateTask;
 	private final String myReadNodeBaseUrl;
@@ -107,35 +107,49 @@ public class Benchmarker {
 	private final Histogram myUpdateLatencyHistogram;
 	private final Histogram myCreateLatencyHistogram;
 	private final boolean myCompression;
-    private int myActiveThreadCount;
+	private final int myMaxThreadCount;
+	private final int myThreadIncrementPerMinute;
+	private final Timer myThreadIncrementer;
+	private int myActiveThreadCount;
 
 	@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
 	private Benchmarker(String[] theArgs) throws IOException {
-		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false]";
-		Validate.isTrue(theArgs.length == 5, syntaxMsg);
+		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false] [ramp up mins]";
+		Validate.isTrue(theArgs.length == 6, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
 		int megascaleDbCount = Integer.parseInt(theArgs[2]);
-        int threadCount = Integer.parseInt(theArgs[3]);
+		myMaxThreadCount = Integer.parseInt(theArgs[3]);
 		myCompression = Boolean.parseBoolean(theArgs[4]);
+
+		int rampUpMins = Integer.parseInt(theArgs[5]);
+		int initialThreadCount;
+		if (rampUpMins > 0) {
+			myThreadIncrementPerMinute = myMaxThreadCount / rampUpMins;
+			initialThreadCount = 1;
+			ourLog.info("Benchmarker starting with {} threads, ramping up by {} per minute to a maximum of {}", initialThreadCount, myThreadIncrementPerMinute, myMaxThreadCount);
+		} else {
+			initialThreadCount = myMaxThreadCount;
+			myThreadIncrementPerMinute = 0;
+			ourLog.info("Benchmarker starting with {} thread count", myMaxThreadCount);
+		}
 
 		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
 		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
-		ourLog.info("Benchmarker starting with {} thread count", threadCount);
 		loadData(megascaleDbCount);
 
-        ThreadPoolTaskExecutor readThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "read-", 100);
-        ThreadPoolTaskExecutor searchThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "search-", 100);
-        ThreadPoolTaskExecutor updateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "update-", 100);
-        ThreadPoolTaskExecutor createThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "create-", 100);
+		ThreadPoolTaskExecutor readThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "read-", 100);
+		ThreadPoolTaskExecutor searchThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "search-", 100);
+		ThreadPoolTaskExecutor updateThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "update-", 100);
+		ThreadPoolTaskExecutor createThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "create-", 100);
 
-		myReadSemaphore = new Semaphore(threadCount, false);
-		mySearchSemaphore = new Semaphore(threadCount, false);
-		myUpdateSemaphore = new Semaphore(threadCount, false);
-		myCreateSemaphore = new Semaphore(threadCount, false);
+		myReadSemaphore = new Semaphore(myMaxThreadCount, false);
+		mySearchSemaphore = new Semaphore(myMaxThreadCount, false);
+		myUpdateSemaphore = new Semaphore(myMaxThreadCount, false);
+		myCreateSemaphore = new Semaphore(myMaxThreadCount, false);
 
-		addSemaphores(threadCount);
+		addSemaphores(initialThreadCount);
 
 		myReadThroughputMeter = Uploader.newMeter();
 		myReadLatencyHistogram = Uploader.newHistogram();
@@ -155,6 +169,7 @@ public class Benchmarker {
 		mySearchTask = new SearchTask(searchThreadPool, mySearchSemaphore);
 		myUpdateTask = new UpdateTask(updateThreadPool, myUpdateSemaphore);
 		myCreateTask = new CreateTask(createThreadPool, myCreateSemaphore);
+		myThreadIncrementer = new Timer();
 
 		myCsvWriter = new FileWriter("benchmark.csv");
 		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
@@ -168,7 +183,7 @@ public class Benchmarker {
 			"ThreadCountPerOperation" +
 			"\n");
 
-        Timer loggerTimer = new Timer();
+		Timer loggerTimer = new Timer();
 		loggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, DateUtils.MILLIS_PER_SECOND);
 	}
 
@@ -295,6 +310,9 @@ public class Benchmarker {
 		mySearchTask.start();
 		myUpdateTask.start();
 		myCreateTask.start();
+		if (myThreadIncrementPerMinute > 0) {
+			myThreadIncrementer.scheduleAtFixedRate(new ThreadIncrementerTask(), 0, 5000);
+		}
 	}
 
 	private void extractCommonValues(CloseableHttpResponse theResponse, boolean theReadOperation) throws IOException {
@@ -485,6 +503,97 @@ public class Benchmarker {
 		}
 	}
 
+	private class ThreadIncrementerTask extends TimerTask {
+		@Override
+		public void run() {
+			int threadDelta = myThreadIncrementPerMinute;
+			if (myActiveThreadCount + threadDelta > myMaxThreadCount) {
+				threadDelta = myMaxThreadCount - myActiveThreadCount;
+			}
+
+			if (threadDelta > 0) {
+				ourLog.info("Incrementing thread count by {} - New total: {}", threadDelta, myActiveThreadCount + threadDelta);
+				addSemaphores(threadDelta);
+			}
+		}
+	}
+
+	private class ProgressLogger extends TimerTask {
+
+		@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
+		@Override
+		public void run() {
+			long totalRead = myReadCount.get();
+			long allTimeRead = (long) mySw.getThroughput(totalRead, TimeUnit.SECONDS);
+			long perSecondRead = ((long) myReadThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerRead = (long) myReadLatencyHistogram.getSnapshot().getMean();
+
+			long totalSearch = mySearchCount.get();
+			long allTimeSearch = (long) mySw.getThroughput(totalSearch, TimeUnit.SECONDS);
+			long perSecondSearch = ((long) mySearchThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerSearch = (long) mySearchLatencyHistogram.getSnapshot().getMean();
+
+			long totalUpdate = myUpdateCount.get();
+			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
+			long perSecondUpdate = ((long) myUpdateThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerUpdate = (long) myUpdateLatencyHistogram.getSnapshot().getMean();
+
+			long totalCreate = myCreateCount.get();
+			long allTimeCreate = (long) mySw.getThroughput(totalCreate, TimeUnit.SECONDS);
+			long perSecondCreate = ((long) myCreateThroughputMeter.getOneMinuteRate()) / 60L;
+			long avgMillisPerCreate = (long) myCreateLatencyHistogram.getSnapshot().getMean();
+
+			long perSecondSuccess = perSecondRead + perSecondSearch + perSecondCreate + perSecondUpdate;
+			long totalFail = myFailureCount.get();
+			long perSecondFail = (long) (myFailureMeter.getOneMinuteRate() / 60L);
+
+			long requestBytesPerSec = (long) (myRequestBytesMeter.getOneMinuteRate() / 60L);
+			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
+
+//			double cacheHitCount = myCacheHitCount.get();
+//			double cacheMissCount = myCacheMissCount.get();
+//			long cacheHitPct = (long) ((cacheHitCount / (cacheMissCount + cacheHitCount)) * 100.0);
+
+			ourLog.info(
+				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
+					"\nREQ[ {} /sec] -- RESP[ {} /sec]" +
+//					"\nCACHE_HIT[ {}% ]" +
+					" ",
+				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myActiveThreadCount,
+				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myActiveThreadCount,
+				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myActiveThreadCount,
+				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myActiveThreadCount,
+				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
+//				cacheHitPct
+			);
+
+			long millis = mySw.getMillis();
+			millis = millis - (millis % 1000);
+
+			try {
+				myCsvWriter.append(
+					millis + "," +
+						totalRead + "," + allTimeRead + "," + perSecondRead + "," +
+						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
+						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
+						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
+						totalFail + "," + perSecondFail + "," +
+						requestBytesPerSec + "," + responseBytesPerSec + "," +
+						myActiveThreadCount +
+						"\n"
+				);
+				myCsvWriter.flush();
+			} catch (Exception e) {
+				ourLog.error("Failed to write CSV", e);
+			}
+		}
+	}
+
 	private abstract static class BaseTaskCreator extends Thread {
 		protected final ThreadPoolTaskExecutor myThreadPool;
 		private final List<IIdType> myIdList;
@@ -520,82 +629,6 @@ public class Benchmarker {
 		}
 
 		protected abstract void run(int thePatientIndex, IIdType thePatientId);
-	}
-
-
-	private class ProgressLogger extends TimerTask {
-
-		@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
-		@Override
-		public void run() {
-			long totalRead = myReadCount.get();
-			long allTimeRead = (long) mySw.getThroughput(totalRead, TimeUnit.SECONDS);
-			long perSecondRead = ((long) myReadThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerRead = (long) myReadLatencyHistogram.getSnapshot().getMean();
-
-			long totalSearch = mySearchCount.get();
-			long allTimeSearch = (long) mySw.getThroughput(totalSearch, TimeUnit.SECONDS);
-			long perSecondSearch = ((long) mySearchThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerSearch = (long) mySearchLatencyHistogram.getSnapshot().getMean();
-
-			long totalUpdate = myUpdateCount.get();
-			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
-			long perSecondUpdate = ((long) myUpdateThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerUpdate = (long) myUpdateLatencyHistogram.getSnapshot().getMean();
-
-			long totalCreate = myCreateCount.get();
-			long allTimeCreate = (long) mySw.getThroughput(totalCreate, TimeUnit.SECONDS);
-			long perSecondCreate = ((long) myCreateThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerCreate = (long) myCreateLatencyHistogram.getSnapshot().getMean();
-
-			long perSecondSuccess = perSecondRead + perSecondSearch + perSecondCreate + perSecondUpdate;
-			long totalFail = myFailureCount.get();
-			long perSecondFail = (long) (myFailureMeter.getOneMinuteRate() / 60L);
-
-			long requestBytesPerSec = (long) (myRequestBytesMeter.getOneMinuteRate() / 60L);
-			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
-
-			double cacheHitCount = myCacheHitCount.get();
-			double cacheMissCount = myCacheMissCount.get();
-			long cacheHitPct = (long) ((cacheHitCount / (cacheMissCount + cacheHitCount)) * 100.0);
-
-			ourLog.info(
-				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
-					"\nREQ[ {} /sec] -- RESP[ {} /sec]" +
-					"\nCACHE_HIT[ {}% ]",
-				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myActiveThreadCount,
-				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myActiveThreadCount,
-				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myActiveThreadCount,
-				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myActiveThreadCount,
-				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
-				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
-				cacheHitPct
-			);
-
-			long millis = mySw.getMillis();
-			millis = millis - (millis % 1000);
-
-			try {
-				myCsvWriter.append(
-					millis + "," +
-						totalRead + "," + allTimeRead + "," + perSecondRead + "," +
-						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
-						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
-						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
-						totalFail + "," + perSecondFail + "," +
-						requestBytesPerSec + "," + responseBytesPerSec + "," +
-						myActiveThreadCount +
-						"\n"
-				);
-				myCsvWriter.flush();
-			} catch (Exception e) {
-				ourLog.error("Failed to write CSV", e);
-			}
-		}
 	}
 
 }
