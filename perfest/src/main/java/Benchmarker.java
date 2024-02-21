@@ -144,10 +144,10 @@ public class Benchmarker {
 		ThreadPoolTaskExecutor updateThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "update-", 100);
 		ThreadPoolTaskExecutor createThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "create-", 100);
 
-		myReadSemaphore = new Semaphore(myMaxThreadCount, false);
-		mySearchSemaphore = new Semaphore(myMaxThreadCount, false);
-		myUpdateSemaphore = new Semaphore(myMaxThreadCount, false);
-		myCreateSemaphore = new Semaphore(myMaxThreadCount, false);
+		myReadSemaphore = new Semaphore(0, false);
+		mySearchSemaphore = new Semaphore(0, false);
+		myUpdateSemaphore = new Semaphore(0, false);
+		myCreateSemaphore = new Semaphore(0, false);
 
 		addSemaphores(initialThreadCount);
 
