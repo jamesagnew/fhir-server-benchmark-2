@@ -311,7 +311,7 @@ public class Benchmarker {
 		myUpdateTask.start();
 		myCreateTask.start();
 		if (myThreadIncrementPerMinute > 0) {
-			myThreadIncrementer.scheduleAtFixedRate(new ThreadIncrementerTask(), 0, 5000);
+			myThreadIncrementer.scheduleAtFixedRate(new ThreadIncrementerTask(), DateUtils.MILLIS_PER_MINUTE, DateUtils.MILLIS_PER_MINUTE);
 		}
 	}
 
