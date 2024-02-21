@@ -103,6 +103,7 @@ public class Benchmarker {
 	private Histogram myUpdateLatencyHistogram;
 	private Histogram myCreateLatencyHistogram;
 	private boolean myCompression;
+	private int myThreadCount;
 
 	private void run(String[] theArgs) throws IOException {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false]";
@@ -110,19 +111,19 @@ public class Benchmarker {
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
 		int megascaleDbCount = Integer.parseInt(theArgs[2]);
-		int threadCount = Integer.parseInt(theArgs[3]);
+		myThreadCount = Integer.parseInt(theArgs[3]);
 		myCompression = Boolean.parseBoolean(theArgs[4]);
 
 		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
 		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
-		ourLog.info("Benchmarker starting with {} thread count", threadCount);
+		ourLog.info("Benchmarker starting with {} thread count", myThreadCount);
 		loadData(megascaleDbCount);
 
-		myReadThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "read-", 100);
-		mySearchThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "search-", 100);
-		myUpdateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "update-", 100);
-		myCreateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "create-", 100);
+		myReadThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "read-", 100);
+		mySearchThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "search-", 100);
+		myUpdateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "update-", 100);
+		myCreateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "create-", 100);
 
 		myReadThroughputMeter = Uploader.newMeter();
 		myReadLatencyHistogram = Uploader.newHistogram();
@@ -507,17 +508,17 @@ public class Benchmarker {
 			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
 
 			ourLog.info(
-				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
-					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
-					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
-					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx] " +
-					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec]" +
+				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
 					"\nREQ[ {} /sec] -- RESP[ {} /sec]",
-				totalRead, allTimeRead, perSecondRead, avgMillisPerRead,
-				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch,
-				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate,
-				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate,
-				perSecondSuccess, totalFail, perSecondFail,
+				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myThreadCount,
+				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myThreadCount,
+				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myThreadCount,
+				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myThreadCount,
+				perSecondSuccess, totalFail, perSecondFail, myThreadCount * 4,
 				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
 			);
 

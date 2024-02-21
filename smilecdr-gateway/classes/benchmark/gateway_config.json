@@ -2,239 +2,323 @@
   "targets" : [ {
     "id" : "Write-def",
     "baseUrl" : "http://localhost:8000/DEFAULT",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "def-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-def",
     "baseUrl" : "http://localhost:8001/DEFAULT",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "def-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms1",
     "baseUrl" : "http://localhost:8000/MS1",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms1-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms1",
     "baseUrl" : "http://localhost:8001/MS1",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms1-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms1-noprefix",
     "baseUrl" : "http://localhost:8000/MS1",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms1-noprefix",
     "baseUrl" : "http://localhost:8001/MS1",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms2",
     "baseUrl" : "http://localhost:8000/MS2",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms2-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms2",
     "baseUrl" : "http://localhost:8001/MS2",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms2-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms2-noprefix",
     "baseUrl" : "http://localhost:8000/MS2",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms2-noprefix",
     "baseUrl" : "http://localhost:8001/MS2",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms3",
     "baseUrl" : "http://localhost:8000/MS3",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms3-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms3",
     "baseUrl" : "http://localhost:8001/MS3",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms3-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms3-noprefix",
     "baseUrl" : "http://localhost:8000/MS3",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms3-noprefix",
     "baseUrl" : "http://localhost:8001/MS3",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms4",
     "baseUrl" : "http://localhost:8000/MS4",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms4-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms4",
     "baseUrl" : "http://localhost:8001/MS4",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms4-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms4-noprefix",
     "baseUrl" : "http://localhost:8000/MS4",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms4-noprefix",
     "baseUrl" : "http://localhost:8001/MS4",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms5",
     "baseUrl" : "http://localhost:8000/MS5",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms5-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms5",
     "baseUrl" : "http://localhost:8001/MS5",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms5-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms5-noprefix",
     "baseUrl" : "http://localhost:8000/MS5",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms5-noprefix",
     "baseUrl" : "http://localhost:8001/MS5",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms6",
     "baseUrl" : "http://localhost:8000/MS6",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms6-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms6",
     "baseUrl" : "http://localhost:8001/MS6",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms6-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms6-noprefix",
     "baseUrl" : "http://localhost:8000/MS6",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms6-noprefix",
     "baseUrl" : "http://localhost:8001/MS6",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms7",
     "baseUrl" : "http://localhost:8000/MS7",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms7-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms7",
     "baseUrl" : "http://localhost:8001/MS7",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms7-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms7-noprefix",
     "baseUrl" : "http://localhost:8000/MS7",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms7-noprefix",
     "baseUrl" : "http://localhost:8001/MS7",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms8",
     "baseUrl" : "http://localhost:8000/MS8",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms8-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms8",
     "baseUrl" : "http://localhost:8001/MS8",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms8-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms8-noprefix",
     "baseUrl" : "http://localhost:8000/MS8",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms8-noprefix",
     "baseUrl" : "http://localhost:8001/MS8",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms9",
     "baseUrl" : "http://localhost:8000/MS9",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms9-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms9",
     "baseUrl" : "http://localhost:8001/MS9",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms9-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms9-noprefix",
     "baseUrl" : "http://localhost:8000/MS9",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms9-noprefix",
     "baseUrl" : "http://localhost:8001/MS9",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms10",
     "baseUrl" : "http://localhost:8000/MS10",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms10-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms10",
     "baseUrl" : "http://localhost:8001/MS10",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "resourceIdPrefix" : "ms10-",
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Write-ms10-noprefix",
     "baseUrl" : "http://localhost:8000/MS10",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   }, {
     "id" : "Read-ms10-noprefix",
     "baseUrl" : "http://localhost:8001/MS10",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
   } ],
   "searchRoutes" : [ {
     "id" : "search",
-    "resourceTypes" : [ "Observation", "Patient", "Encounter" ],
+    "resourceTypes" : [ "Encounter", "Observation", "Patient" ],
     "targets" : [ {
       "targetId" : "Read-ms1"
     }, {
@@ -261,7 +345,7 @@
   } ],
   "readRoutes" : [ {
     "id" : "read",
-    "resourceTypes" : [ "Observation", "Patient", "Encounter" ],
+    "resourceTypes" : [ "Encounter", "Observation", "Patient" ],
     "targets" : [ {
       "targetId" : "Read-ms1"
     }, {
@@ -287,7 +371,7 @@
   } ],
   "updateRoutes" : [ {
     "id" : "update",
-    "resourceTypes" : [ "SearchParameter", "Patient", "Observation", "Encounter" ],
+    "resourceTypes" : [ "Encounter", "Observation", "Patient", "SearchParameter" ],
     "targets" : [ {
       "targetId" : "Write-def"
     }, {

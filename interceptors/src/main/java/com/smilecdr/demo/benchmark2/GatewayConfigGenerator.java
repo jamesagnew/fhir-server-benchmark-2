@@ -15,6 +15,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class GatewayConfigGenerator {
 
@@ -42,7 +43,7 @@ public class GatewayConfigGenerator {
 		searchRoute.setId("search");
 		searchRoute.setParallel(false);
 		searchRoute.setDisablePaging(true);
-		searchRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
+		searchRoute.setResourceTypes(new TreeSet<>(Set.of("Patient", "Observation", "Encounter")));
 		for (int i = 1; i <= megascaleCount; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
@@ -51,7 +52,7 @@ public class GatewayConfigGenerator {
 		GatewayReadRouteJson readRoute = config.addReadRoute();
 		readRoute.setId("read");
 		readRoute.setParallel(false);
-		readRoute.setResourceTypes(Set.of("Patient", "Observation", "Encounter"));
+		readRoute.setResourceTypes(new TreeSet<>(Set.of("Patient", "Observation", "Encounter")));
 		for (int i = 1; i <= megascaleCount; i++) {
 			readRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
@@ -60,7 +61,7 @@ public class GatewayConfigGenerator {
 		GatewayUpdateRouteJson updateRoute = config.addUpdateRoute();
 		updateRoute.setId("update");
 		updateRoute.setParallel(false);
-		updateRoute.setResourceTypes(Set.of("SearchParameter", "Patient", "Observation", "Encounter"));
+		updateRoute.setResourceTypes(new TreeSet<>(Set.of("SearchParameter", "Patient", "Observation", "Encounter")));
 		updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-def"));
 		for (int i = 1; i <= megascaleCount; i++) {
 			updateRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Write-ms" + i));
@@ -98,6 +99,8 @@ public class GatewayConfigGenerator {
 		target.setBaseUrl("http://localhost:" + endpointPort + "/" + partitionName);
 		target.setHeadersToForward(List.of(Constants.HEADER_AUTHORIZATION));
 		target.setServerCapabilityStatementValidationEnabled(false);
+		target.setConnectTimeoutMillis(300 * 1000);
+		target.setSocketTimeoutMillis(300 * 1000);
 		if (thePrefixed) {
 			target.setResourceIdPrefix(partitionId + "-");
 		}
