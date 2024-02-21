@@ -568,7 +568,7 @@ public class Benchmarker {
 				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myActiveThreadCount,
 				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myActiveThreadCount,
 				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
-				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
 //				cacheHitPct
 			);
 
