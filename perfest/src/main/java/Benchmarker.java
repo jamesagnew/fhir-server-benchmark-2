@@ -72,76 +72,70 @@ public class Benchmarker {
 	};
 	private static final Logger ourLog = LoggerFactory.getLogger(Benchmarker.class);
 	private static final FhirContext ourCtx = FhirContext.forR4Cached();
-	private static final int PATIENT_COUNT = 1000;
 	private final Semaphore myReadSemaphore;
 	private final Semaphore mySearchSemaphore;
 	private final Semaphore myUpdateSemaphore;
 	private final Semaphore myCreateSemaphore;
-	private IGenericClient myGatewayFhirClient;
-	private List<IIdType> myPatientIds = new ArrayList<>();
-	private List<IIdType> myEncounterIds = new ArrayList<>();
-	private Map<String, Encounter> myEncounters = new HashMap<>();
-	private ThreadPoolTaskExecutor myReadThreadPool;
-	private ThreadPoolTaskExecutor mySearchThreadPool;
-	private ThreadPoolTaskExecutor myUpdateThreadPool;
-	private ThreadPoolTaskExecutor myCreateThreadPool;
-	private ReadTask myReadTask;
-	private String myGatewayBaseUrl;
-	private AtomicLong myFailureCount = new AtomicLong(0);
-	private AtomicLong myReadCount = new AtomicLong(0);
-	private AtomicLong myCacheHitCount = new AtomicLong(0);
-	private AtomicLong myCacheMissCount = new AtomicLong(0);
-	private AtomicLong mySearchCount = new AtomicLong(0);
-	private AtomicLong myUpdateCount = new AtomicLong(0);
-	private AtomicLong myCreateCount = new AtomicLong(0);
-	private Meter myReadThroughputMeter;
-	private Meter mySearchThroughputMeter;
-	private Meter myUpdateThroughputMeter;
-	private Meter myCreateThroughputMeter;
-	private Meter myFailureMeter;
-	private Timer myLoggerTimer;
-	private StopWatch mySw;
-	private SearchTask mySearchTask;
-	private UpdateTask myUpdateTask;
-	private String myReadNodeBaseUrl;
-	private CreateTask myCreateTask;
-	private FileWriter myCsvWriter;
-	private Meter myRequestBytesMeter;
-	private Meter myResponseBytesMeter;
-	private Histogram myReadLatencyHistogram;
-	private Histogram mySearchLatencyHistogram;
-	private Histogram myUpdateLatencyHistogram;
-	private Histogram myCreateLatencyHistogram;
-	private boolean myCompression;
-	private int myThreadCount;
-	private int myActiveThreadCount;
+	private final IGenericClient myGatewayFhirClient;
+	private final List<IIdType> myPatientIds = new ArrayList<>();
+	private final List<IIdType> myEncounterIds = new ArrayList<>();
+	private final Map<String, Encounter> myEncounters = new HashMap<>();
+    private final ReadTask myReadTask;
+	private final String myGatewayBaseUrl;
+	private final AtomicLong myFailureCount = new AtomicLong(0);
+	private final AtomicLong myReadCount = new AtomicLong(0);
+	private final AtomicLong myCacheHitCount = new AtomicLong(0);
+	private final AtomicLong myCacheMissCount = new AtomicLong(0);
+	private final AtomicLong mySearchCount = new AtomicLong(0);
+	private final AtomicLong myUpdateCount = new AtomicLong(0);
+	private final AtomicLong myCreateCount = new AtomicLong(0);
+	private final Meter myReadThroughputMeter;
+	private final Meter mySearchThroughputMeter;
+	private final Meter myUpdateThroughputMeter;
+	private final Meter myCreateThroughputMeter;
+	private final Meter myFailureMeter;
+    private final StopWatch mySw;
+	private final SearchTask mySearchTask;
+	private final UpdateTask myUpdateTask;
+	private final String myReadNodeBaseUrl;
+	private final CreateTask myCreateTask;
+	private final FileWriter myCsvWriter;
+	private final Meter myRequestBytesMeter;
+	private final Meter myResponseBytesMeter;
+	private final Histogram myReadLatencyHistogram;
+	private final Histogram mySearchLatencyHistogram;
+	private final Histogram myUpdateLatencyHistogram;
+	private final Histogram myCreateLatencyHistogram;
+	private final boolean myCompression;
+    private int myActiveThreadCount;
 
+	@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
 	private Benchmarker(String[] theArgs) throws IOException {
 		String syntaxMsg = "Syntax: " + Benchmarker.class.getName() + " [gateway base URL] [read node base URL] [megascale DB count] [thread count] [compression true/false]";
 		Validate.isTrue(theArgs.length == 5, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
 		int megascaleDbCount = Integer.parseInt(theArgs[2]);
-		myThreadCount = Integer.parseInt(theArgs[3]);
+        int threadCount = Integer.parseInt(theArgs[3]);
 		myCompression = Boolean.parseBoolean(theArgs[4]);
 
 		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
 		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
-		ourLog.info("Benchmarker starting with {} thread count", myThreadCount);
+		ourLog.info("Benchmarker starting with {} thread count", threadCount);
 		loadData(megascaleDbCount);
 
-		myReadThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "read-", 100);
-		mySearchThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "search-", 100);
-		myUpdateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "update-", 100);
-		myCreateThreadPool = ThreadPoolUtil.newThreadPool(myThreadCount, myThreadCount, "create-", 100);
+        ThreadPoolTaskExecutor readThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "read-", 100);
+        ThreadPoolTaskExecutor searchThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "search-", 100);
+        ThreadPoolTaskExecutor updateThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "update-", 100);
+        ThreadPoolTaskExecutor createThreadPool = ThreadPoolUtil.newThreadPool(threadCount, threadCount, "create-", 100);
 
-		myReadSemaphore = new Semaphore(myThreadCount, false);
-		mySearchSemaphore = new Semaphore(myThreadCount, false);
-		myUpdateSemaphore = new Semaphore(myThreadCount, false);
-		myCreateSemaphore = new Semaphore(myThreadCount, false);
+		myReadSemaphore = new Semaphore(threadCount, false);
+		mySearchSemaphore = new Semaphore(threadCount, false);
+		myUpdateSemaphore = new Semaphore(threadCount, false);
+		myCreateSemaphore = new Semaphore(threadCount, false);
 
-		addSemaphores(myThreadCount);
+		addSemaphores(threadCount);
 
 		myReadThroughputMeter = Uploader.newMeter();
 		myReadLatencyHistogram = Uploader.newHistogram();
@@ -157,14 +151,10 @@ public class Benchmarker {
 
 		mySw = new StopWatch();
 
-		myReadTask = new ReadTask(myReadThreadPool, myReadSemaphore);
-		myReadTask.start();
-		mySearchTask = new SearchTask(mySearchThreadPool, mySearchSemaphore);
-		mySearchTask.start();
-		myUpdateTask = new UpdateTask(myUpdateThreadPool, myUpdateSemaphore);
-		myUpdateTask.start();
-		myCreateTask = new CreateTask(myCreateThreadPool, myCreateSemaphore);
-		myCreateTask.start();
+		myReadTask = new ReadTask(readThreadPool, myReadSemaphore);
+		mySearchTask = new SearchTask(searchThreadPool, mySearchSemaphore);
+		myUpdateTask = new UpdateTask(updateThreadPool, myUpdateSemaphore);
+		myCreateTask = new CreateTask(createThreadPool, myCreateSemaphore);
 
 		myCsvWriter = new FileWriter("benchmark.csv");
 		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
@@ -178,8 +168,8 @@ public class Benchmarker {
 			"ThreadCountPerOperation" +
 			"\n");
 
-		myLoggerTimer = new Timer();
-		myLoggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, 1L * DateUtils.MILLIS_PER_SECOND);
+        Timer loggerTimer = new Timer();
+		loggerTimer.scheduleAtFixedRate(new ProgressLogger(), 0L, DateUtils.MILLIS_PER_SECOND);
 	}
 
 	private void addSemaphores(int theThreadCount) {
@@ -300,9 +290,29 @@ public class Benchmarker {
 		}
 	}
 
+	private void start() {
+		myReadTask.start();
+		mySearchTask.start();
+		myUpdateTask.start();
+		myCreateTask.start();
+	}
+
+	private void extractCommonValues(CloseableHttpResponse theResponse, boolean theReadOperation) throws IOException {
+		long bytes = consumeStream(theResponse.getEntity().getContent());
+		myResponseBytesMeter.mark(bytes);
+
+		if (theReadOperation) {
+			Header xCache = theResponse.getFirstHeader(Constants.HEADER_X_CACHE);
+			if (xCache != null && startsWith(xCache.getValue(), "HIT")) {
+				myCacheHitCount.incrementAndGet();
+			} else {
+				myCacheMissCount.incrementAndGet();
+			}
+		}
+	}
 
 	public static void main(String[] theArgs) throws IOException {
-		new Benchmarker().run(theArgs);
+		new Benchmarker(theArgs).start();
 	}
 
 	private static long consumeStream(InputStream is) throws IOException {
@@ -316,7 +326,7 @@ public class Benchmarker {
 
 	private class ReadTask extends BaseTaskCreator {
 
-		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
+		private final CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 		public ReadTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
 			super(theThreadPool, theSemaphore, myPatientIds);
@@ -347,7 +357,7 @@ public class Benchmarker {
 	}
 
 	private class SearchTask extends BaseTaskCreator {
-		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
+		private final CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
 		public SearchTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
@@ -379,7 +389,7 @@ public class Benchmarker {
 	}
 
 	private class UpdateTask extends BaseTaskCreator {
-		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
+		private final CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 
 		public UpdateTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
@@ -430,7 +440,7 @@ public class Benchmarker {
 
 	private class CreateTask extends BaseTaskCreator {
 
-		private CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
+		private final CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
 		public CreateTask(ThreadPoolTaskExecutor theThreadPool, Semaphore theSemaphore) {
 			super(theThreadPool, theSemaphore, myPatientIds);
@@ -475,21 +485,7 @@ public class Benchmarker {
 		}
 	}
 
-	private void extractCommonValues(CloseableHttpResponse theResponse, boolean theReadOperation) throws IOException {
-		long bytes = consumeStream(theResponse.getEntity().getContent());
-		myResponseBytesMeter.mark(bytes);
-
-		if (theReadOperation) {
-			Header xCache = theResponse.getFirstHeader(Constants.HEADER_X_CACHE);
-			if (xCache != null && startsWith(xCache.getValue(), "HIT")) {
-				myCacheHitCount.incrementAndGet();
-			} else {
-				myCacheMissCount.incrementAndGet();
-			}
-		}
-	}
-
-	private abstract class BaseTaskCreator extends Thread {
+	private abstract static class BaseTaskCreator extends Thread {
 		protected final ThreadPoolTaskExecutor myThreadPool;
 		private final List<IIdType> myIdList;
 		private final Semaphore mySemaphore;
@@ -500,6 +496,7 @@ public class Benchmarker {
 			mySemaphore = theSemaphore;
 		}
 
+		@SuppressWarnings("InfiniteLoopStatement")
 		@Override
 		public void run() {
 			while (true) {
@@ -507,13 +504,13 @@ public class Benchmarker {
 					int idIndex = (int) (Math.random() * myIdList.size());
 					IIdType id = myIdList.get(idIndex);
 
-                    try {
-                        mySemaphore.acquire();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+					try {
+						mySemaphore.acquire();
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
 						return;
-                    }
-                    try {
+					}
+					try {
 						run(idIndex, id);
 					} finally {
 						mySemaphore.release();
@@ -528,6 +525,7 @@ public class Benchmarker {
 
 	private class ProgressLogger extends TimerTask {
 
+		@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
 		@Override
 		public void run() {
 			long totalRead = myReadCount.get();
