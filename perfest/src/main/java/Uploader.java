@@ -123,7 +123,7 @@ public class Uploader extends BaseFileIterator {
 
 		myCsvWriter = new FileWriter("upload-synthea.csv", true);
 		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
-		myCsvWriter.append("\n# MillisSinceStart, FilesPerSecond, ResPerSecondOverall, ResPerSecondMovingAvg, Retries, Failures\n");
+		myCsvWriter.append("\n# MillisSinceStart, TimeSinceStart, FilesPerSecond, ResPerSecondOverall, ResPerSecondMovingAvg, Retries, Failures\n");
 
 		myLogTimer = new Timer();
 		long delay = DateUtils.MILLIS_PER_MINUTE;
@@ -193,6 +193,7 @@ public class Uploader extends BaseFileIterator {
 				millis = millis - (millis % 1000);
 				myCsvWriter.append(
 					millis + "," +
+						StopWatch.formatMillis(millis) + "," +
 						filesPerSecondOverall + "," +
 						resourcePerSecondOverall + "," +
 						resourcesPerSecondSliding + "," +

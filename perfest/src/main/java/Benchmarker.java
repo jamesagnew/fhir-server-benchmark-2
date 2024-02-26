@@ -174,6 +174,7 @@ public class Benchmarker {
 		myCsvWriter = new FileWriter("benchmark.csv");
 		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
 		myCsvWriter.append("\n# MillisSinceStart, " +
+			"TimeSinceStart, " +
 			"TotalRead, AllTimeReadPerSec, MovingAvgReadPerSec, " +
 			"TotalSearch, AllTimeSearchPerSec, MovingAvgSearchPerSec, " +
 			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, " +
@@ -578,6 +579,7 @@ public class Benchmarker {
 			try {
 				myCsvWriter.append(
 					millis + "," +
+						StopWatch.formatMillis(millis) + "," +
 						totalRead + "," + allTimeRead + "," + perSecondRead + "," +
 						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
 						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
