@@ -31,6 +31,7 @@ public class GatewayInterceptor {
 	public void searchSelectRoute(SearchRequest theRequest, GatewayTargetJson theTarget) {
 		ourLog.info("Search for {} with target {}", theRequest.getResourceType(), theTarget.getId());
 		if (theTarget.getId().equals("Read-hp")) {
+			ourLog.info("Proceeding");
 			return;
 		}
 

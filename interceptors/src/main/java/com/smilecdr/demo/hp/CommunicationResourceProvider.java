@@ -6,14 +6,19 @@ import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 import org.hl7.fhir.r4.model.Communication;
 import org.hl7.fhir.r4.model.StringType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class CommunicationResourceProvider implements IResourceProvider {
+	private static final Logger ourLog = LoggerFactory.getLogger(CommunicationResourceProvider.class);
 
 	@Search(allowUnknownParams = true)
 	public List<Communication> search(
 		@RequiredParam(name=Communication.SP_PATIENT) ReferenceParam thePatient) {
+
+		ourLog.info("Fetching Communication resources for {}", thePatient.getValue());
 
 		Communication communication0 = new Communication();
 		communication0.setId("Communication/A0");
