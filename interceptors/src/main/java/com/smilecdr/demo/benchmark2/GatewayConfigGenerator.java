@@ -50,6 +50,14 @@ public class GatewayConfigGenerator {
 		}
 		searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-hp"));
 
+		// Search Communication Route
+		GatewaySearchRouteJson searchCommRoute = config.addSearchRoute();
+		searchCommRoute.setId("search-comm");
+		searchCommRoute.setParallel(false);
+		searchCommRoute.setDisablePaging(true);
+		searchCommRoute.setResourceTypes(new TreeSet<>(Set.of("Communication")));
+		searchCommRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-hp"));
+
 		// Read Route
 		GatewayReadRouteJson readRoute = config.addReadRoute();
 		readRoute.setId("read");

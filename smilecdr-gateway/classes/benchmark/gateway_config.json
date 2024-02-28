@@ -160,6 +160,14 @@
     } ],
     "parallel" : false,
     "disablePaging" : true
+  }, {
+    "id" : "search-comm",
+    "resourceTypes" : [ "Communication" ],
+    "targets" : [ {
+      "targetId" : "Read-hp"
+    } ],
+    "parallel" : false,
+    "disablePaging" : true
   } ],
   "readRoutes" : [ {
     "id" : "read",
