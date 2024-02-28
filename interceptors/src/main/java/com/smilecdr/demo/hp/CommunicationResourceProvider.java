@@ -16,11 +16,13 @@ public class CommunicationResourceProvider implements IResourceProvider {
 		@RequiredParam(name=Communication.SP_PATIENT) ReferenceParam thePatient) {
 
 		Communication communication0 = new Communication();
+		communication0.setId("Communication/A0");
 		communication0.getSubject().setReference(thePatient.getValue());
 		communication0.addPayload()
 			.setContent(new StringType("This is an example communication"));
 
 		Communication communication1 = new Communication();
+		communication1.setId("Communication/A1");
 		communication1.getSubject().setReference(thePatient.getValue());
 		communication1.addPayload()
 			.setContent(new StringType("Another message is here"));
