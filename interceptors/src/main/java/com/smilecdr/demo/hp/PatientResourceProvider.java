@@ -32,6 +32,7 @@ public class PatientResourceProvider implements IResourceProvider {
 	@NotNull
 	private static Patient createExamplePatient() {
 		Patient patient = new Patient();
+		patient.setId("Patient/123");
 		patient.addIdentifier()
 			.setSystem("http://example.com")
 			.setValue("12345");
