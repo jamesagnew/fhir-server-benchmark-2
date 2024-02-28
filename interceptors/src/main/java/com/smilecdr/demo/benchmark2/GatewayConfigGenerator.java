@@ -37,6 +37,7 @@ public class GatewayConfigGenerator {
 			addTarget(config, "Write", "ms" + i, "8000", "MS" + i, false);
 			addTarget(config, "Read", "ms" + i, "8001", "MS" + i, false);
 		}
+		addTarget(config, "Read", "hp", "8003", "", false);
 
 		// Search Route
 		GatewaySearchRouteJson searchRoute = config.addSearchRoute();
@@ -47,6 +48,7 @@ public class GatewayConfigGenerator {
 		for (int i = 1; i <= megascaleCount; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
+		searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-hp-noprefix"));
 
 		// Read Route
 		GatewayReadRouteJson readRoute = config.addReadRoute();

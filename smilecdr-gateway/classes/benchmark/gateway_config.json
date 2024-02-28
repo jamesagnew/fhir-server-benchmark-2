@@ -315,6 +315,13 @@
     "socketTimeoutMillis" : 300000,
     "serverCapabilityStatementValidationEnabled" : false,
     "headersToForward" : [ "Authorization" ]
+  }, {
+    "id" : "Read-hp-noprefix",
+    "baseUrl" : "http://localhost:8003/",
+    "connectTimeoutMillis" : 300000,
+    "socketTimeoutMillis" : 300000,
+    "serverCapabilityStatementValidationEnabled" : false,
+    "headersToForward" : [ "Authorization" ]
   } ],
   "searchRoutes" : [ {
     "id" : "search",
@@ -339,6 +346,8 @@
       "targetId" : "Read-ms9"
     }, {
       "targetId" : "Read-ms10"
+    }, {
+      "targetId" : "Read-hp-noprefix"
     } ],
     "parallel" : false,
     "disablePaging" : true
