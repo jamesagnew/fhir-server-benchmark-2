@@ -29,7 +29,8 @@ public class GatewayInterceptor {
 
 	@CdrHook(CdrPointcut.FHIRGW_SEARCH_TARGET_PREINVOKE)
 	public void searchSelectRoute(SearchRequest theRequest, GatewayTargetJson theTarget) {
-		if (theRequest.getResourceType().equals("Communication")) {
+		ourLog.info("Search for {} with target {}", theRequest.getResourceType(), theTarget.getId());
+		if (theTarget.getId().equals("Read-hp")) {
 			return;
 		}
 
