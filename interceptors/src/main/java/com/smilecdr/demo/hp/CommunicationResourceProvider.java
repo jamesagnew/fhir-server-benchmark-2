@@ -13,15 +13,15 @@ public class CommunicationResourceProvider implements IResourceProvider {
 
 	@Search(allowUnknownParams = true)
 	public List<Communication> search(
-		@RequiredParam(name=Communication.SP_SUBJECT) ReferenceParam theSubject) {
+		@RequiredParam(name=Communication.SP_PATIENT) ReferenceParam thePatient) {
 
 		Communication communication0 = new Communication();
-		communication0.getSubject().setReference(theSubject.getValue());
+		communication0.getSubject().setReference(thePatient.getValue());
 		communication0.addPayload()
 			.setContent(new StringType("This is an example communication"));
 
 		Communication communication1 = new Communication();
-		communication1.getSubject().setReference(theSubject.getValue());
+		communication1.getSubject().setReference(thePatient.getValue());
 		communication1.addPayload()
 			.setContent(new StringType("Another message is here"));
 

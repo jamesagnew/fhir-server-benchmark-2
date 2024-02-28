@@ -18,11 +18,16 @@ public class PatientResourceProvider implements IResourceProvider {
 		if (theIdentifier != null) {
 			if ("http://example.com".equals(theIdentifier.getSystem())) {
 				if ("12345".equals(theIdentifier.getValue())) {
-                    return List.of(createExamplePatient());
+                    return List.of(createExamplePatient("http://example.com", "12345"));
+				}
+			}
+			if ("https://github.com/synthetichealth/synthea".equals(theIdentifier.getSystem())) {
+				if ("1218f05f-d919-c02d-d836-01a7caa569fb".equals(theIdentifier.getValue())) {
+					return List.of(createExamplePatient("https://github.com/synthetichealth/synthea", "1218f05f-d919-c02d-d836-01a7caa569fb"));
 				}
 			}
 		} else {
-			return List.of(createExamplePatient());
+			return List.of(createExamplePatient("http://example.com", "12345"));
 		}
 
 		// Otherwise, return an empty list of patents
@@ -30,12 +35,12 @@ public class PatientResourceProvider implements IResourceProvider {
 	}
 
 	@NotNull
-	private static Patient createExamplePatient() {
+	private static Patient createExamplePatient(String theIdentifierSystem, String theIdentifierValue) {
 		Patient patient = new Patient();
 		patient.setId("Patient/123");
 		patient.addIdentifier()
-			.setSystem("http://example.com")
-			.setValue("12345");
+			.setSystem(theIdentifierSystem)
+			.setValue(theIdentifierValue);
 		patient.addName()
 			.setFamily("Simpson")
 			.addGiven("Homer")

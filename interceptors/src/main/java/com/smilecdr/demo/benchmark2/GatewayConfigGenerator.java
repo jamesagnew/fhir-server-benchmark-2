@@ -26,7 +26,7 @@ public class GatewayConfigGenerator {
 		// It doesn't really matter if we create routes for more megascale DBs than
 		// we actually have, since the target servers will be ok with whatever
 		// we do.
-		int megascaleCount = 10;
+		int megascaleCount = 4;
 		
 		// Add targets
         addTarget(config, "Write", "def", "8000", "DEFAULT", true);
@@ -37,7 +37,7 @@ public class GatewayConfigGenerator {
 			addTarget(config, "Write", "ms" + i, "8000", "MS" + i, false);
 			addTarget(config, "Read", "ms" + i, "8001", "MS" + i, false);
 		}
-		addTarget(config, "Read", "hp", "8003", "", false);
+		addTarget(config, "Read", "hp", "8003", "", true);
 
 		// Search Route
 		GatewaySearchRouteJson searchRoute = config.addSearchRoute();
@@ -48,7 +48,7 @@ public class GatewayConfigGenerator {
 		for (int i = 1; i <= megascaleCount; i++) {
 			searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-ms" + i));
 		}
-		searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-hp-noprefix"));
+		searchRoute.addTarget(new GatewayRouteTargetJson().setTargetId("Read-hp"));
 
 		// Read Route
 		GatewayReadRouteJson readRoute = config.addReadRoute();
