@@ -1,6 +1,7 @@
 package com.smilecdr.demo.hp;
 
 import ca.uhn.fhir.rest.annotation.RequiredParam;
+import ca.uhn.fhir.rest.annotation.Search;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 import org.hl7.fhir.r4.model.Communication;
@@ -10,6 +11,7 @@ import java.util.List;
 
 public class CommunicationResourceProvider implements IResourceProvider {
 
+	@Search(allowUnknownParams = true)
 	public List<Communication> search(
 		@RequiredParam(name=Communication.SP_SUBJECT) ReferenceParam theSubject) {
 
