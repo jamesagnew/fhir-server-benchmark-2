@@ -215,7 +215,7 @@ public class UploaderDirect extends BaseFileIterator {
 			int resourcePerSecondOverall = (int) mySw.getThroughput(resourcesUploaded, TimeUnit.SECONDS);
 			int filesPerSecondOverall = (int) mySw.getThroughput(filesUploaded, TimeUnit.SECONDS);
 
-			int resourcesPerSecondSliding = (int) myResourcesUploadedMeter.getMeanRate();
+			int resourcesPerSecondSliding = (int) (myResourcesUploadedMeter.getOneMinuteRate() / 60.0);
 
 			int retryCount = myRetryCount.get();
 			int failureCount = myFailureCount.get();
