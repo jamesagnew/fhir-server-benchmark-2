@@ -9,6 +9,7 @@ import ca.uhn.fhir.util.StringUtil;
 import ca.uhn.fhir.util.ThreadPoolUtil;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.Snapshot;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -175,10 +177,10 @@ public class Benchmarker {
 		myCsvWriter.append("\n\n# Written: " + InstantType.now().asStringValue());
 		myCsvWriter.append("\n# MillisSinceStart, " +
 			"TimeSinceStart, " +
-			"TotalRead, AllTimeReadPerSec, MovingAvgReadPerSec, " +
-			"TotalSearch, AllTimeSearchPerSec, MovingAvgSearchPerSec, " +
-			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, " +
-			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, " +
+			"TotalRead, AllTimeReadPerSec, MovingAvgReadPerSec, ReadAvgMsPerTx, Read75pctMsPerTx, Read95pctMsPerTx, " +
+			"TotalSearch, AllTimeSearchPerSec, MovingAvgSearchPerSec, SearchAvgMsPerTx, Search75pctMsPerTx, Search95pctMsPerTx, " +
+			"TotalUpdate, AllTimeUpdatePerSec, MovingAvgUpdatePerSec, UpdateAvgMsPerTx, Update75pctMsPerTx, Update95pctMsPerTx, " +
+			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, CreateAvgMsPerTx, Create75pctMsPerTx, Create95pctMsPerTx, " +
 			"TotalFailures, MovingAvgFailuresPerSec, " +
 			"MovingAvgRequestBytesPerSec, MovingAvgResponseBytesPerSec, " +
 			"ThreadCountPerOperation" +
@@ -353,7 +355,9 @@ public class Benchmarker {
 
 		@Override
 		protected void run(int thePatientIndex, IIdType thePatientId) {
-			String url = thePatientId.getValue() + "?_elements=id&_elements:exclude=Patient.meta";
+			String patientId = thePatientId.getIdPart();
+			patientId = maybeReplaceWithNonExistent(patientId);
+			String url = myGatewayBaseUrl + "/Patient/" + patientId + "?_elements=id&_elements:exclude=Patient.meta";
 			HttpGet get = new HttpGet(url);
 			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
@@ -375,6 +379,14 @@ public class Benchmarker {
 		}
 	}
 
+	private String maybeReplaceWithNonExistent(String thePatientId) {
+		double random = Math.random();
+		if (random < 0.3) {
+			return UUID.randomUUID().toString();
+		}
+		return thePatientId;
+	}
+
 	private class SearchTask extends BaseTaskCreator {
 		private final CloseableHttpClient myHttpClient = Uploader.createHttpClient(myCompression);
 
@@ -385,7 +397,9 @@ public class Benchmarker {
 
 		@Override
 		protected void run(int thePatientIndex, IIdType thePatientId) {
-			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + thePatientId.getIdPart() + "&_count=1&_elements=id&_elements:exclude=Observation.meta";
+			String patientId = thePatientId.getIdPart();
+			patientId = maybeReplaceWithNonExistent(patientId);
+			String url = myGatewayBaseUrl + "/Observation?patient=Patient/" + patientId + "&_count=1&_elements=id&_elements:exclude=Observation.meta";
 			HttpGet get = new HttpGet(url);
 			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
@@ -524,25 +538,37 @@ public class Benchmarker {
 		@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
 		@Override
 		public void run() {
+			Snapshot readSnapshot = myReadLatencyHistogram.getSnapshot();
 			long totalRead = myReadCount.get();
 			long allTimeRead = (long) mySw.getThroughput(totalRead, TimeUnit.SECONDS);
 			long perSecondRead = ((long) myReadThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerRead = (long) myReadLatencyHistogram.getSnapshot().getMean();
+			long avgMillisPerRead = (long) readSnapshot.getMean();
+			long read75thPct = (long) readSnapshot.get75thPercentile();
+			long read95thPct = (long) readSnapshot.get95thPercentile();
 
+			Snapshot searchSnapshot = mySearchLatencyHistogram.getSnapshot();
 			long totalSearch = mySearchCount.get();
 			long allTimeSearch = (long) mySw.getThroughput(totalSearch, TimeUnit.SECONDS);
 			long perSecondSearch = ((long) mySearchThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerSearch = (long) mySearchLatencyHistogram.getSnapshot().getMean();
+			long avgMillisPerSearch = (long) searchSnapshot.getMean();
+			long search75thPct = (long) searchSnapshot.get75thPercentile();
+			long search95thPct = (long) searchSnapshot.get95thPercentile();
 
+			Snapshot updateSnapshot = myUpdateLatencyHistogram.getSnapshot();
 			long totalUpdate = myUpdateCount.get();
 			long allTimeUpdate = (long) mySw.getThroughput(totalUpdate, TimeUnit.SECONDS);
 			long perSecondUpdate = ((long) myUpdateThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerUpdate = (long) myUpdateLatencyHistogram.getSnapshot().getMean();
+			long avgMillisPerUpdate = (long) updateSnapshot.getMean();
+			long update75thPct = (long) updateSnapshot.get75thPercentile();
+			long update95thPct = (long) updateSnapshot.get95thPercentile();
 
+			Snapshot createSnapshot = myCreateLatencyHistogram.getSnapshot();
 			long totalCreate = myCreateCount.get();
 			long allTimeCreate = (long) mySw.getThroughput(totalCreate, TimeUnit.SECONDS);
 			long perSecondCreate = ((long) myCreateThroughputMeter.getOneMinuteRate()) / 60L;
-			long avgMillisPerCreate = (long) myCreateLatencyHistogram.getSnapshot().getMean();
+			long avgMillisPerCreate = (long) createSnapshot.getMean();
+			long create75thPct = (long) createSnapshot.get75thPercentile();
+			long create95thPct = (long) createSnapshot.get95thPercentile();
 
 			long perSecondSuccess = perSecondRead + perSecondSearch + perSecondCreate + perSecondUpdate;
 			long totalFail = myFailureCount.get();
@@ -551,26 +577,26 @@ public class Benchmarker {
 			long requestBytesPerSec = (long) (myRequestBytesMeter.getOneMinuteRate() / 60L);
 			long responseBytesPerSec = (long) (myResponseBytesMeter.getOneMinuteRate() / 60L);
 
-//			double cacheHitCount = myCacheHitCount.get();
-//			double cacheMissCount = myCacheMissCount.get();
-//			long cacheHitPct = (long) ((cacheHitCount / (cacheMissCount + cacheHitCount)) * 100.0);
+			double cacheHitCount = myCacheHitCount.get();
+			double cacheMissCount = myCacheMissCount.get();
+			long cacheHitPct = (long) ((cacheHitCount / (cacheMissCount + cacheHitCount)) * 100.0);
 
 			ourLog.info(
-				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
-					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx - {} Concurrent] " +
+				"\nREAD[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx / 75pct {}ms/tx / 95pct {}ms/tx - {} Concurrent] " +
+					"\nSEARCH[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx / 75pct {}ms/tx / 95pct {}ms/tx - {} Concurrent] " +
+					"\nUPDATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx / 75pct {}ms/tx / 95pct {}ms/tx - {} Concurrent] " +
+					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx / 75pct {}ms/tx / 95pct {}ms/tx - {} Concurrent] " +
 					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
 					"\nREQ[ {} /sec] -- RESP[ {} /sec]" +
-//					"\nCACHE_HIT[ {}% ]" +
+					"\nCACHE_HIT[ {}% ]" +
 					" ",
-				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, myActiveThreadCount,
-				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, myActiveThreadCount,
-				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, myActiveThreadCount,
-				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, myActiveThreadCount,
+				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, read75thPct, read95thPct, myActiveThreadCount,
+				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, search75thPct, search95thPct, myActiveThreadCount,
+				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, update75thPct, update95thPct, myActiveThreadCount,
+				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, create75thPct, create95thPct, myActiveThreadCount,
 				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
-				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
-//				cacheHitPct
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
+				cacheHitPct
 			);
 
 			long millis = mySw.getMillis();
@@ -580,10 +606,10 @@ public class Benchmarker {
 				myCsvWriter.append(
 					millis + "," +
 						StopWatch.formatMillis(millis) + "," +
-						totalRead + "," + allTimeRead + "," + perSecondRead + "," +
-						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," +
-						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," +
-						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," +
+						totalRead + "," + allTimeRead + "," + perSecondRead + "," + avgMillisPerRead + "," + read75thPct + "," + read95thPct + ", " +
+						totalSearch + "," + allTimeSearch + "," + perSecondSearch + "," + avgMillisPerSearch + "," + search75thPct + "," + search95thPct + ", " +
+						totalUpdate + "," + allTimeUpdate + "," + perSecondUpdate + "," + avgMillisPerUpdate + "," + update75thPct + "," + update95thPct + ", " +
+						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," + avgMillisPerCreate + "," + create75thPct + "," + create95thPct + ", " +
 						totalFail + "," + perSecondFail + "," +
 						requestBytesPerSec + "," + responseBytesPerSec + "," +
 						myActiveThreadCount +
