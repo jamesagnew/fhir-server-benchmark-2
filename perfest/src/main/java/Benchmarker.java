@@ -184,7 +184,8 @@ public class Benchmarker {
 			"TotalCreate, AllTimeCreatePerSec, MovingAvgCreatePerSec, CreateAvgMsPerTx, Create75pctMsPerTx, Create95pctMsPerTx, " +
 			"TotalFailures, MovingAvgFailuresPerSec, " +
 			"MovingAvgRequestBytesPerSec, MovingAvgResponseBytesPerSec, " +
-			"ThreadCountPerOperation" +
+			"ThreadCountPerOperation, " +
+			"CachePct" +
 			"\n");
 
 		Timer loggerTimer = new Timer();
@@ -614,7 +615,8 @@ public class Benchmarker {
 						totalCreate + "," + allTimeCreate + "," + perSecondCreate + "," + avgMillisPerCreate + "," + create75thPct + "," + create95thPct + ", " +
 						totalFail + "," + perSecondFail + "," +
 						requestBytesPerSec + "," + responseBytesPerSec + "," +
-						myActiveThreadCount +
+						myActiveThreadCount + "," +
+						cacheHitPct +
 						"\n"
 				);
 				myCsvWriter.flush();
