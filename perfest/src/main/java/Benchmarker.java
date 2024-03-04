@@ -112,6 +112,7 @@ public class Benchmarker {
 	private final int myMaxThreadCount;
 	private final int myThreadIncrementPerMinute;
 	private final Timer myThreadIncrementer;
+	private final int myMegascaleDbCount;
 	private int myActiveThreadCount;
 
 	@SuppressWarnings("StringConcatenationInsideStringBufferAppend")
@@ -120,7 +121,7 @@ public class Benchmarker {
 		Validate.isTrue(theArgs.length == 6, syntaxMsg);
 		myGatewayBaseUrl = StringUtil.chompCharacter(theArgs[0], '/');
 		myReadNodeBaseUrl = StringUtil.chompCharacter(theArgs[1], '/');
-		int megascaleDbCount = Integer.parseInt(theArgs[2]);
+		myMegascaleDbCount = Integer.parseInt(theArgs[2]);
 		myMaxThreadCount = Integer.parseInt(theArgs[3]);
 		myCompression = Boolean.parseBoolean(theArgs[4]);
 
@@ -139,7 +140,7 @@ public class Benchmarker {
 		myGatewayFhirClient = ourCtx.newRestfulGenericClient(myGatewayBaseUrl);
 		myGatewayFhirClient.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
 
-		loadData(megascaleDbCount);
+		loadData(myMegascaleDbCount);
 
 		ThreadPoolTaskExecutor readThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "read-", 100);
 		ThreadPoolTaskExecutor searchThreadPool = ThreadPoolUtil.newThreadPool(myMaxThreadCount, myMaxThreadCount, "search-", 100);
@@ -382,7 +383,8 @@ public class Benchmarker {
 	private String maybeReplaceWithNonExistent(String thePatientId) {
 		double random = Math.random();
 		if (random < 0.3) {
-			return UUID.randomUUID().toString();
+			int partitionNumber = (int) ((double)myMegascaleDbCount * Math.random()) + 1;
+			return "ms" + partitionNumber + "-" + UUID.randomUUID();
 		}
 		return thePatientId;
 	}
