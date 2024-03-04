@@ -362,7 +362,7 @@ public class Benchmarker {
 			HttpGet get = new HttpGet(url);
 			long start = System.currentTimeMillis();
 			try (var response = myHttpClient.execute(get)) {
-				if (response.getStatusLine().getStatusCode() == 200) {
+				if (response.getStatusLine().getStatusCode() == 200 || response.getStatusLine().getStatusCode() == 404) {
 					myReadThroughputMeter.mark();
 					myReadCount.incrementAndGet();
 					myReadLatencyHistogram.update(System.currentTimeMillis() - start);
