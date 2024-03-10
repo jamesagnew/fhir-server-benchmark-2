@@ -3,6 +3,7 @@ import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
 import ca.uhn.fhir.rest.client.interceptor.UrlTenantSelectionInterceptor;
+import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.util.ResourceReferenceInfo;
 import ca.uhn.fhir.util.StopWatch;
 import ca.uhn.fhir.util.StringUtil;
@@ -10,6 +11,7 @@ import ca.uhn.fhir.util.ThreadPoolUtil;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Snapshot;
+import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.commons.lang3.time.DateUtils;
@@ -204,6 +206,8 @@ public class Benchmarker {
 	private void loadData(int theMegascaleDbCount) {
 		int idsPerMegaScaleDb = 1000 / theMegascaleDbCount;
 
+		ourCtx.getRestfulClientFactory().setConnectTimeout(120_000);
+		ourCtx.getRestfulClientFactory().setSocketTimeout(120_000);
 		for (int i = 1; i <= theMegascaleDbCount; i++) {
 			IGenericClient client = ourCtx.newRestfulGenericClient(myReadNodeBaseUrl);
 			client.registerInterceptor(new BasicAuthInterceptor("admin", "password"));
@@ -259,17 +263,49 @@ public class Benchmarker {
 
 	private void loadDataEncounters(int theIdsPerMegaScaleDb, int theMegaScaleDbIndex, List<IIdType> thePatientIds, IGenericClient theClient) {
 		List<Encounter> encounters = new ArrayList<>();
+
+		List<List<IIdType>> partitions = ListUtils.partition(thePatientIds, 5);
+		for (var nextPartition: partitions) {
+			loadEncounters(theIdsPerMegaScaleDb, theMegaScaleDbIndex, nextPartition, theClient, encounters);
+		}
+
+		for (var next : encounters) {
+			IIdType nextId = next.getIdElement().toUnqualifiedVersionless();
+			myEncounterIds.add(nextId);
+			myEncounters.put(nextId.getValue(), next);
+		}
+	}
+
+	private void loadEncounters(int theIdsPerMegaScaleDb, int theMegaScaleDbIndex, List<IIdType> thePatientIds, IGenericClient theClient, List<Encounter> encounters) {
 		ourLog.info("Loading Encounter List Page 0 for MegaScale DB {}...", theMegaScaleDbIndex);
 		List<String> ids = thePatientIds.stream()
 			.map(t -> t.toUnqualifiedVersionless().getValue())
 			.collect(Collectors.toList());
-		Bundle outcome = theClient
-			.search()
-			.forResource(Encounter.class)
-			.where(Encounter.PATIENT.hasAnyOfIds(ids))
-			.returnBundle(Bundle.class)
-			.execute();
-		int pageIndex = 0;
+		Bundle outcome = null;
+
+		int count = 0;
+		int max = 5;
+		while (true) {
+			try {
+				outcome = theClient
+					.search()
+					.forResource(Encounter.class)
+					.where(Encounter.PATIENT.hasAnyOfIds(ids))
+					.count(5)
+					.returnBundle(Bundle.class)
+					.execute();
+				break;
+			} catch (InternalErrorException e) {
+				count++;
+				if (count > max) {
+					throw e;
+				}
+				ourLog.info("Failure loading page URL (retry {} / {}). IDs: {}", count, max, ids);
+			}
+		}
+
+
+        int pageIndex = 0;
 		while (true) {
 			List<Encounter> pageEncounters = outcome
 				.getEntry()
@@ -299,14 +335,21 @@ public class Benchmarker {
 			}
 
 			ourLog.info("Loading Encounter List Page {} for MegaScale DB {}, have {} IDs...", ++pageIndex, theMegaScaleDbIndex, encounters.size());
-			outcome = myGatewayFhirClient.loadPage().next(outcome).execute();
 
-		}
+			count = 0;
+			while (true) {
+				try {
+					outcome = myGatewayFhirClient.loadPage().next(outcome).execute();
+					break;
+				} catch (InternalErrorException e) {
+					count++;
+					if (count > max) {
+						throw e;
+					}
+					ourLog.info("Failure loading page URL (retry {} / {}): {}", count, max, outcome.getLink("next").getUrl());
+				}
+			}
 
-		for (var next : encounters) {
-			IIdType nextId = next.getIdElement().toUnqualifiedVersionless();
-			myEncounterIds.add(nextId);
-			myEncounters.put(nextId.getValue(), next);
 		}
 	}
 
