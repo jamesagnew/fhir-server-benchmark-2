@@ -411,13 +411,13 @@ public class Benchmarker {
 					myReadCount.incrementAndGet();
 					myReadLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
-					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+					ourLog.debug("Failure executing URL[{}]: {}", url, response.getStatusLine());
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
 				extractCommonValues(response, true);
 			} catch (Exception e) {
-				ourLog.warn("Failure executing URL[{}]", url, e);
+				ourLog.debug("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
@@ -426,7 +426,7 @@ public class Benchmarker {
 
 	private String maybeReplaceWithNonExistent(String thePatientId) {
 		double random = Math.random();
-		if (random < 0.3) {
+		if (false && random < 0.3) {
 			int partitionNumber = (int) ((double)myMegascaleDbCount * Math.random()) + 1;
 			return "ms" + partitionNumber + "-" + UUID.randomUUID();
 		}
@@ -454,13 +454,13 @@ public class Benchmarker {
 					mySearchCount.incrementAndGet();
 					mySearchLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
-					ourLog.warn("Failure executing URL[{}]: {}", url, response.getStatusLine());
+					ourLog.debug("Failure executing URL[{}]: {}", url, response.getStatusLine());
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
 				extractCommonValues(response, true);
 			} catch (Exception e) {
-				ourLog.warn("Failure executing URL[{}]", url, e);
+				ourLog.debug("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
@@ -503,14 +503,14 @@ public class Benchmarker {
 						myUpdateThroughputMeter.mark();
 						myUpdateCount.incrementAndGet();
 					} else {
-						ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), response);
+						ourLog.debug("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), response);
 						myFailureMeter.mark();
 						myFailureCount.incrementAndGet();
 					}
 				}
 				extractCommonValues(response, false);
 			} catch (Exception e) {
-				ourLog.warn("Failure executing URL[{}]", url, e);
+				ourLog.debug("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
@@ -551,13 +551,13 @@ public class Benchmarker {
 					myCreateLatencyHistogram.update(System.currentTimeMillis() - start);
 				} else {
 					String results = IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8);
-					ourLog.warn("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
+					ourLog.debug("Failure executing URL[{}]: {}\n{}", url, response.getStatusLine(), results);
 					myFailureMeter.mark();
 					myFailureCount.incrementAndGet();
 				}
 				extractCommonValues(response, false);
 			} catch (Exception e) {
-				ourLog.warn("Failure executing URL[{}]", url, e);
+				ourLog.debug("Failure executing URL[{}]", url, e);
 				myFailureMeter.mark();
 				myFailureCount.incrementAndGet();
 			}
@@ -634,15 +634,15 @@ public class Benchmarker {
 					"\nCREATE[ Total {} - All {}/sec - MovAvg {}/sec - Avg {}ms/tx / 75pct {}ms/tx / 95pct {}ms/tx - {} Concurrent] " +
 					"\nSUCCESS[ MovAvg {}/sec] -- FAIL[ Total {} - MovAvg {}/sec - {} Concurrent]" +
 					"\nREQ[ {} /sec] -- RESP[ {} /sec]" +
-					"\nCACHE_HIT[ {}% ]" +
+//					"\nCACHE_HIT[ {}% ]" +
 					" ",
 				totalRead, allTimeRead, perSecondRead, avgMillisPerRead, read75thPct, read95thPct, myActiveThreadCount,
 				totalSearch, allTimeSearch, perSecondSearch, avgMillisPerSearch, search75thPct, search95thPct, myActiveThreadCount,
 				totalUpdate, allTimeUpdate, perSecondUpdate, avgMillisPerUpdate, update75thPct, update95thPct, myActiveThreadCount,
 				totalCreate, allTimeCreate, perSecondCreate, avgMillisPerCreate, create75thPct, create95thPct, myActiveThreadCount,
 				perSecondSuccess, totalFail, perSecondFail, myActiveThreadCount * 4,
-				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec),
-				cacheHitPct
+				byteCountToDisplaySize(requestBytesPerSec), byteCountToDisplaySize(responseBytesPerSec)
+//				cacheHitPct
 			);
 
 			long millis = mySw.getMillis();

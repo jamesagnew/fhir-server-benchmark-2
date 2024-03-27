@@ -52,10 +52,19 @@ public class GatewayInterceptor {
 	@CdrHook(CdrPointcut.FHIRGW_CREATE_TARGET_PREINVOKE)
 	public void createSelectRoute(CreateRequest theRequest, GatewayTargetJson theTarget) {
 
-		Observation obs = (Observation) theRequest.getResource();
-		String patientIdRaw = obs.getSubject().getReference();
-		if (!patientIdRaw.startsWith("Patient/ms") || !patientIdRaw.contains("-")) {
-			throw new InvalidRequestException("Invalid subject specified provided: " + patientIdRaw);
+		String patientIdRaw;
+		if (theRequest.getResource() instanceof Patient) {
+			Patient patient = (Patient) theRequest.getResource();
+			patientIdRaw = patient.getIdElement().toUnqualifiedVersionless().getValue();
+		} else if (theRequest.getResource() instanceof Observation) {
+			Observation obs = (Observation) theRequest.getResource();
+			patientIdRaw = obs.getSubject().getReference();
+		} else {
+			throw new InvalidRequestException("This interceptor only currently supports creating Patient and Observation resources");
+		}
+
+        if (!patientIdRaw.startsWith("Patient/ms") || !patientIdRaw.contains("-")) {
+			throw new InvalidRequestException("Invalid patient/subject ID provided: " + patientIdRaw + " (must be in the form Patient/ms[index]-[id])");
 		}
 
 		String partitionId = patientIdRaw.substring("Patient/ms".length(), patientIdRaw.indexOf('-'));
